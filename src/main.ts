@@ -1,47 +1,34 @@
 /**
- * Punto de entrada. Por ahora solo comprueba que la base funciona:
- * pantalla de inicio (WebAudio y el micrófono necesitan un clic) y un render de Three.js
- * a baja resolución en cada mitad. La integración real se hace en los hitos 1 a 6
- * siguiendo docs/CONTRATOS.md.
+ * Integración: crea el bus, la simulación y los clientes, y los hace avanzar una vez por cuadro.
+ * Los módulos no se conocen entre sí; solo comparten el bus (docs/CONTRATOS.md).
  */
-import * as THREE from 'three';
+import { crearAudio } from './audio';
+import { BusLocal } from './bus/BusLocal';
 import { CONFIG } from './config';
+import { ALA_ESTE } from './data/alaEste';
+import { LsmEngine } from './lsm';
+import muestras from './lsm/data/samples.json';
+import { crearClienteOido } from './oido';
+import { crearPanelRadio } from './radio';
+import { crearVozSintetica } from './radio/voz';
+import { crearMicrofono } from './ruido/microfono';
+import type { Fase, Sistema } from './shared/contratos';
+import { Simulacion } from './sim/Simulacion';
+import { crearClienteVista } from './vista';
 
-function montarPlaceholder(contenedor: HTMLElement, color: number): () => void {
-  const renderer = new THREE.WebGLRenderer({ antialias: false });
-  renderer.setPixelRatio(1);
-  const lienzo = renderer.domElement;
-  lienzo.style.cssText = 'width:100%;height:100%;display:block;image-rendering:pixelated';
-  contenedor.appendChild(lienzo);
+const $ = <T extends HTMLElement>(id: string): T => {
+  const el = document.getElementById(id);
+  if (!el) throw new Error(`Falta #${id} en index.html`);
+  return el as T;
+};
 
-  const escena = new THREE.Scene();
-  escena.fog = new THREE.Fog(0x000000, 1, 6);
-  const camara = new THREE.PerspectiveCamera(60, 1, 0.1, 50);
-  camara.position.z = 3;
-  const cubo = new THREE.Mesh(
-    new THREE.BoxGeometry(1, 1, 1),
-    new THREE.MeshBasicMaterial({ color, wireframe: true }),
-  );
-  escena.add(cubo);
+const inicio = $('inicio');
+const aviso = $('aviso');
+const fin = $('fin');
 
-  const ajustar = () => {
-    const ancho = Math.max(1, contenedor.clientWidth);
-    const alto = Math.max(1, contenedor.clientHeight);
-    // Estilo PSX: se dibuja a baja resolución y el CSS lo escala sin suavizado.
-    const h = CONFIG.render.altoInterno;
-    const w = Math.round((h * ancho) / alto);
-    renderer.setSize(w, h, false);
-    camara.aspect = ancho / alto;
-    camara.updateProjectionMatrix();
-  };
-  ajustar();
-  window.addEventListener('resize', ajustar);
-
-  return () => {
-    cubo.rotation.x += 0.01;
-    cubo.rotation.y += 0.013;
-    renderer.render(escena, camara);
-  };
+function mostrarAviso(texto: string): void {
+  aviso.textContent = texto;
+  aviso.hidden = texto === '';
 }
 
 function bloquearTeclasDelNavegador(): void {
@@ -52,22 +39,97 @@ function bloquearTeclasDelNavegador(): void {
   window.addEventListener('contextmenu', (e) => e.preventDefault());
 }
 
-function arrancar(): void {
-  const oido = document.getElementById('oido');
-  const vista = document.getElementById('vista');
-  if (!oido || !vista) throw new Error('Faltan los contenedores #oido y #vista');
+const radioAbierto = (): boolean => document.body.dataset.radioAbierto === '1';
 
+async function arrancar(conDispositivos: boolean): Promise<void> {
+  inicio.remove();
   bloquearTeclasDelNavegador();
-  const pasos = [montarPlaceholder(oido, 0x2a332a), montarPlaceholder(vista, 0x7fae7f)];
-  const ciclo = () => {
-    for (const paso of pasos) paso();
+
+  const mapa = ALA_ESTE;
+  const bus = new BusLocal();
+  const ctx = new AudioContext();
+  void ctx.resume();
+
+  const sim = new Simulacion(bus, mapa);
+  const oido = crearClienteOido(bus, $('oido'), mapa);
+  const vista = crearClienteVista(bus, $('vista'), mapa);
+  const voz = crearVozSintetica();
+  const audio = crearAudio(bus, mapa, ctx, voz);
+  const microfono = crearMicrofono(bus, ctx);
+
+  // Sin cámara se juega igual: el panel del radio acepta el teclado (AGENTS.md §5).
+  const lsm = conDispositivos ? new LsmEngine({ samples: muestras.samples }) : null;
+  const radio = crearPanelRadio(bus, vista.panelRadio, lsm);
+
+  // La simulación va primero: los clientes dibujan y suenan lo que ella anuncia.
+  const sistemas: Sistema[] = [sim, microfono, oido, vista, radio, audio];
+
+  let fase: Fase = 'inicio';
+  bus.escuchar('sim/estado', (e) => {
+    if (e.fase === fase) return;
+    fase = e.fase;
+    fin.hidden = fase !== 'ganaron' && fase !== 'perdieron';
+  });
+
+  const reiniciar = (): void => {
+    if (fase === 'ganaron' || fase === 'perdieron') bus.enviar('juego/reiniciar', {});
+  };
+  $('btn-reiniciar').addEventListener('click', reiniciar);
+
+  // Teclas de la integración: reinicio y ruido simulado (respaldo sin micrófono).
+  const { reiniciar: teclaReiniciar, ruidoCuidado, ruidoPeligro } = CONFIG.teclas.general;
+  const simulando = new Set<string>();
+  const aplicarRuidoSimulado = (): void => {
+    microfono.nivelSimulado = simulando.has(ruidoPeligro)
+      ? CONFIG.ruido.simuladoPeligro
+      : simulando.has(ruidoCuidado)
+        ? CONFIG.ruido.simuladoCuidado
+        : 0;
+  };
+  window.addEventListener('keydown', (e) => {
+    if (e.code === teclaReiniciar) {
+      e.preventDefault();
+      reiniciar();
+    } else if ((e.code === ruidoCuidado || e.code === ruidoPeligro) && !radioAbierto()) {
+      simulando.add(e.code);
+      aplicarRuidoSimulado();
+    }
+  });
+  window.addEventListener('keyup', (e) => {
+    if (simulando.delete(e.code)) aplicarRuidoSimulado();
+  });
+  window.addEventListener('blur', () => {
+    simulando.clear();
+    aplicarRuidoSimulado();
+  });
+
+  let antes = performance.now();
+  const ciclo = (ahora: number): void => {
+    // Tope de 0.1 s: al volver de otra pestaña no debe dar un salto enorme.
+    const dt = Math.min(0.1, (ahora - antes) / 1000);
+    antes = ahora;
+    for (const s of sistemas) s.actualizar(dt);
     requestAnimationFrame(ciclo);
   };
   requestAnimationFrame(ciclo);
+
+  if (conDispositivos && lsm) {
+    mostrarAviso('Preparando la cámara y el micrófono…');
+    const [hayCamara, hayMicrofono] = await Promise.all([lsm.enableCamera(), microfono.iniciar()]);
+    if (hayMicrofono) {
+      mostrarAviso(`Calibrando el ruido del cuarto: ${CONFIG.ruido.segCalibracion} segundos de silencio, por favor.`);
+      await microfono.calibrar();
+    }
+    const faltan = [
+      hayCamara ? '' : 'Sin cámara: las señas se teclean (Tab abre el radio).',
+      hayMicrofono ? '' : 'Sin micrófono: el ruido solo viene del juego.',
+    ].filter(Boolean);
+    mostrarAviso(faltan.join(' '));
+    if (faltan.length > 0) window.setTimeout(() => mostrarAviso(''), CONFIG.interfaz.msAviso);
+  }
+
+  bus.enviar('juego/iniciar', {});
 }
 
-const inicio = document.getElementById('inicio');
-document.getElementById('btn-inicio')?.addEventListener('click', () => {
-  inicio?.remove();
-  arrancar();
-});
+$('btn-inicio').addEventListener('click', () => void arrancar(true));
+$('btn-teclado').addEventListener('click', () => void arrancar(false));

@@ -88,12 +88,12 @@ Cópialo a este proyecto (`src/lsm/` + `public/mediapipe/hand_landmarker.task` +
 | Concepto y diseño | ✅ Definido (2026-11-19) | Ver `docs/DISENO.md` |
 | MVP: un reto, una PC, pantalla dividida | 🔨 En curso | Alcance en `docs/DISENO.md` §9. Hitos abajo |
 | · Hito 0: base (Vite, Three.js, `src/lsm/`, bus local, contratos) | ✅ 2026-11-19 | `docs/CONTRATOS.md`; git solo local, sin remoto |
-| · Hito 1: mundo y simulación | ⬜ | Mapa del ala este, movimiento, colisiones, puertas |
-| · Hito 2: pantallas (Oído en tinieblas, cámaras VHS de Vista) | ⬜ | |
-| · Hito 3: audio 3D | ⬜ | |
-| · Hito 4: radio (señas, números con dedos, voz) | ⬜ | |
-| · Hito 5: ruido y monstruo | ⬜ | |
-| · Hito 6: partida completa | ⬜ | |
+| · Hito 1: mundo y simulación | ✅ 2026-11-19 | `src/sim/`, `src/data/alaEste.ts`; 51 pruebas |
+| · Hito 2: pantallas (Oído en tinieblas, cámaras VHS de Vista) | ✅ 2026-11-19 | Visto en el navegador. Falta: pointer lock real y medir FPS en la PC del foro |
+| · Hito 3: audio 3D | 🔨 Código hecho | **Nadie lo ha oído todavía**: falta probar con audífonos de diadema y ajustar volúmenes |
+| · Hito 4: radio (señas, números con dedos, voz) | 🔨 Código hecho | Probado con teclado. **Falta probar con cámara**: señas sostenidas, conteo de dedos y S de emergencia |
+| · Hito 5: ruido y monstruo | 🔨 Código hecho | Lógica probada. **Falta probar el micrófono real** y su calibración |
+| · Hito 6: partida completa | 🔨 | Se gana de principio a fin con teclado en el navegador. Falta la partida real con dos personas, tutorial guiado y punto de control |
 | Fase 2: dos PC en red, ecolocalización, transcripción, Vosk | ⬜ | |
 | Pulsera háptica (Arduino) | ⬜ | El equipo tiene un Arduino; plan en `docs/DISENO.md` §8 |
 | Pulido para el foro | ⬜ | |

@@ -38,6 +38,15 @@ export const CONFIG = {
     segCalibracion: 5,
     /** dB por encima del ruido base que equivalen a nivel 1. */
     rangoDb: 30,
+    /** Nivel que mandan las teclas de ruido simulado (respaldo sin micrófono). */
+    simuladoCuidado: 0.5,
+    simuladoPeligro: 0.9,
+  },
+
+  /** Dueño: integración. */
+  interfaz: {
+    /** Tiempo que se quedan en pantalla los avisos de "sin cámara / sin micrófono". */
+    msAviso: 6000,
   },
 
   /** Dueño: simulación (hito 5). */
@@ -90,6 +99,12 @@ export const CONFIG = {
       borrar: 'Backspace',
       enviar: 'Enter',
       puerta: 'KeyP',
+    },
+    /** Integración. El ruido simulado no actúa con el radio abierto (N y M no son señas, pero por orden). */
+    general: {
+      reiniciar: 'F2',
+      ruidoCuidado: 'KeyN',
+      ruidoPeligro: 'KeyM',
     },
   },
 } as const;

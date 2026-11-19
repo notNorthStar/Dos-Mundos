@@ -15,6 +15,11 @@
 **Qué resultó:** proyecto Vite + TypeScript estricto + Three.js (`package.json`, `index.html`, `src/main.ts`, `src/config.ts`), módulo de LSM copiado de ECOS a `src/lsm/` sin cambios (sin el adaptador de Phaser), bus local con pruebas (`src/bus/`, `test/`), contratos (`docs/CONTRATOS.md`, `src/shared/contratos.ts`), `CREDITOS.md` y repositorio git local.
 **Qué decidió o modificó el equipo:** aprobó el plan de 7 hitos; git solo local, sin repositorio remoto por ahora.
 
+## 2026-11-19 · Claude Code (Fable 5.2 en la sesión principal; subagentes Fable 5.2 y Opus 5.5) · Hitos 1 a 6, primera versión jugable
+**Qué se pidió:** continuar con el MVP usando subagentes en paralelo, variando el modelo según el trabajo, y firmar los commits con el modelo de la sesión.
+**Qué resultó:** mapa del ala este y utilidades (sesión principal); simulación con movimiento, puertas, ruido y monstruo (`src/sim/`, Fable 5.2); mundo 3D PSX, pantalla de Oído y cámaras VHS de Vista (`src/mundo3d/`, `src/oido/`, `src/vista/`, Fable 5.2); audio espacial sintetizado por código y micrófono (`src/audio/`, `src/ruido/`, Opus 5.5); panel del radio, conteo de dedos y voz sintética (`src/radio/`, Opus 5.5); integración en `src/main.ts`. 127 pruebas de lógica en verde y partida ganada en el navegador con teclado.
+**Qué decidió o modificó el equipo:** firma de commits según el modelo de la sesión; subagentes repartidos entre Fable 5.2 y Opus 5.5. Pendiente del equipo: probar con audífonos, cámara y micrófono.
+
 <!-- Plantilla:
 ## AAAA-MM-DD · <herramienta>
 **Qué se pidió:**

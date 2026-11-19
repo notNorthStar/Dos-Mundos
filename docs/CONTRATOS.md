@@ -89,17 +89,19 @@ Valores propios de un módulo que no estén en `src/config.ts` van en un archivo
 |---|---|---|
 | Cliente Oído (pantalla y controles) | `src/oido/index.ts` | `crearClienteOido(bus, contenedor, mapa): Sistema` |
 | Cliente Vista (cámaras, mapa, HUD) | `src/vista/index.ts` | `crearClienteVista(bus, contenedor, mapa): Sistema` |
-| Mundo 3D compartido | `src/mundo3d/index.ts` | `construirMundo(mapa): { escena, actualizar(estado) }` (geometría y texturas PSX; lo usan las dos pantallas, cada una con su escena) |
+| Mundo 3D compartido | `src/mundo3d/index.ts` | `construirMundo(mapa, { mostrarOido? }): { escena, actualizar(estado, dtSeg), destruir() }` (geometría y texturas PSX; lo usan las dos pantallas, cada una con su escena y sus luces) · `estadoInicial(mapa)` |
 | Audio de Oído | `src/audio/index.ts` | `crearAudio(bus, mapa, ctx: AudioContext, voz: VozRadio): Sistema` |
 | Voz del radio | `src/radio/voz.ts` | `crearVozSintetica(): VozRadio` (después: `crearVozGrabada(ctx)`) |
 | Panel del radio | `src/radio/index.ts` | `crearPanelRadio(bus, contenedor, lsm: LsmEngine \| null): Sistema` · `fichasATexto(fichas): string` |
 | Conteo de dedos | `src/radio/dedos.ts` | `contarDedos(frame: HandFrame): 0–5` |
-| Micrófono | `src/ruido/microfono.ts` | `crearMicrofono(bus, ctx): { calibrar(): Promise<void>; activo: boolean } & Sistema` |
+| Micrófono | `src/ruido/microfono.ts` | `crearMicrofono(bus, ctx): Microfono` = `Sistema` + `iniciar(): Promise<boolean>` · `calibrar(): Promise<void>` · `activo` · `calibrando` · `baseDb` · `nivelSimulado` |
 
 Reglas de las interfaces:
 - **El radio suena del lado de Oído.** El panel de Vista solo manda `radio/mensaje`; el audio lo dice con `VozRadio` y le pone la estática.
 - **Sin cámara** (`lsm = null`), el panel del radio funciona con el teclado: una letra o un número sustituyen a la seña.
-- **Sin micrófono**, `crearMicrofono` no falla: `activo` queda en `false` y no manda nada. El ruido del juego sigue funcionando.
+- **Sin micrófono**, `iniciar()` devuelve `false` sin fallar y el módulo manda `nivelSimulado` (0 si nadie lo toca). La integración lo conecta a las teclas de ruido simulado (`CONFIG.teclas.general`). El ruido del juego sigue funcionando.
+- **`crearClienteVista` devuelve además `panelRadio`** (el `<div id="panel-radio">`), donde la integración monta el panel del radio.
+- **Un solo panel de radio por `LsmEngine`**: el panel mueve el `<video>` de la cámara a su propio contenedor.
 - **Teclado:** cada cliente escucha solo sus teclas de `CONFIG.teclas`. Con el detector de señas abierto, el panel del radio captura las letras y los números (los números dejan de cambiar de cámara).
 
 ## 5. Reglas de la simulación que los clientes pueden dar por hechas

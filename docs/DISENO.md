@@ -108,7 +108,11 @@ Dos ventanas no sirven (el teclado solo llega a la ventana activa), así que es 
 | **Vista** (lado izquierdo del teclado) | `1`–`5` cambian de cámara · `Tab` abre o cierra el detector de señas · `Retroceso` borra la última ficha · `Enter` envía · `P` abre o cierra la puerta de la cámara activa `[PROPUESTA]` · con el detector abierto, **teclear una letra** sustituye a la seña (respaldo sin cámara) |
 | **Oído** (flechas y mouse) | `↑` `↓` avanzar y retroceder · `←` `→` girar 90° (una pulsación = una orden de "gira" del radio) · mouse: giro fino · **clic izquierdo**: interactuar (agarrar, usar, abrir) · `Shift` derecho: correr (hace ruido) |
 
-Todas las teclas van en un archivo de configuración. **Nunca Ctrl.**
+| **Generales** | `F2` reintenta al ganar o perder · `N` y `M` (mantener) simulan ruido en zona de cuidado y de peligro, para probar sin micrófono |
+
+Todas las teclas van en un archivo de configuración (`src/config.ts`). **Nunca Ctrl.**
+
+La pantalla de inicio ofrece dos modos: **Empezar** (pide cámara y micrófono y calibra 5 s de silencio) y **solo teclado** (sin cámara ni micrófono).
 
 ### 6.2 Fase 2: dos PC
 - **PC de Vista:** teclado completo para ella (`Enter` para enviar, como pidió el equipo). Cámara web enfrente.

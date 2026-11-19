@@ -19,7 +19,15 @@
       #inicio p { margin: 0; max-width: 520px; font-size: 14px; line-height: 1.5; opacity: 0.75; }
       #inicio button { font: inherit; font-size: 18px; letter-spacing: 3px; padding: 12px 34px;
         background: #0c0f0c; color: #cfd6cf; border: 1px solid #5a665a; cursor: pointer; }
-      #inicio button:hover { background: #1a201a; }
+      #inicio button:hover, #fin button:hover { background: #1a201a; }
+      #inicio .secundario { font-size: 13px; padding: 8px 20px; opacity: 0.8; }
+      #aviso { position: fixed; top: 12px; left: 50%; transform: translateX(-50%); z-index: 8;
+        max-width: 80vw; padding: 8px 16px; font-size: 13px; text-align: center;
+        background: rgba(0, 0, 0, 0.85); border: 1px solid #5a665a; }
+      #fin { position: fixed; bottom: 18px; left: 25%; transform: translateX(-50%); z-index: 8; }
+      #fin button { font: inherit; font-size: 14px; letter-spacing: 2px; padding: 8px 20px;
+        background: #0c0f0c; color: #cfd6cf; border: 1px solid #5a665a; cursor: pointer; }
+      [hidden] { display: none !important; }
     </style>
   </head>
   <body>
@@ -32,7 +40,10 @@
       <p>Para dos personas. Oído: ojos vendados y audífonos de diadema. Vista: frente a la cámara, sin audífonos.</p>
       <p>La cámara y el micrófono se procesan en tu equipo; no se graba ni se envía nada.</p>
       <button id="btn-inicio" type="button">EMPEZAR</button>
+      <button id="btn-teclado" class="secundario" type="button">SIN CÁMARA NI MICRÓFONO (SOLO TECLADO)</button>
     </div>
+    <div id="aviso" hidden></div>
+    <div id="fin" hidden><button id="btn-reiniciar" type="button">REINTENTAR (F2)</button></div>
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>
