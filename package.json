@@ -1,0 +1,29 @@
+{
+  "name": "dos-mundos",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Dos Mundos — Listick Games. Juego cooperativo de terror 3D: Vista (señas de LSM) y Oído (audio espacial 3D).",
+  "type": "module",
+  "author": "Listick Games",
+  "scripts": {
+    "setup": "node tools/setup-mediapipe.mjs",
+    "predev": "node tools/setup-mediapipe.mjs",
+    "dev": "vite",
+    "prebuild": "node tools/setup-mediapipe.mjs",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@mediapipe/tasks-vision": "1.0.1",
+    "three": "^0.187.0"
+  },
+  "devDependencies": {
+    "@types/node": "24.19.2",
+    "@types/three": "^0.187.0",
+    "typescript": "5.9.3",
+    "vite": "7.3.7",
+    "vitest": "^5.1.1"
+  }
+}

@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="es-MX">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Dos Mundos</title>
+    <style>
+      html, body { margin: 0; height: 100%; background: #000; color: #cfd6cf; overflow: hidden;
+        font-family: 'Courier New', monospace; }
+      #app { position: fixed; inset: 0; display: flex; }
+      /* Oído a la izquierda, Vista a la derecha (DISENO.md §9) */
+      #oido, #vista { position: relative; flex: 1 1 50%; min-width: 0; overflow: hidden; }
+      #oido { border-right: 2px solid #1a1f1a; }
+      .etiqueta { position: absolute; top: 8px; left: 10px; font-size: 12px; letter-spacing: 2px;
+        opacity: 0.55; pointer-events: none; z-index: 2; }
+      #inicio { position: fixed; inset: 0; z-index: 10; display: flex; flex-direction: column;
+        align-items: center; justify-content: center; gap: 18px; background: #000; text-align: center; }
+      #inicio h1 { margin: 0; font-size: 44px; letter-spacing: 8px; font-weight: normal; }
+      #inicio p { margin: 0; max-width: 520px; font-size: 14px; line-height: 1.5; opacity: 0.75; }
+      #inicio button { font: inherit; font-size: 18px; letter-spacing: 3px; padding: 12px 34px;
+        background: #0c0f0c; color: #cfd6cf; border: 1px solid #5a665a; cursor: pointer; }
+      #inicio button:hover { background: #1a201a; }
+    </style>
+  </head>
+  <body>
+    <div id="app">
+      <section id="oido"><span class="etiqueta">OÍDO</span></section>
+      <section id="vista"><span class="etiqueta">VISTA</span></section>
+    </div>
+    <div id="inicio">
+      <h1>DOS MUNDOS</h1>
+      <p>Para dos personas. Oído: ojos vendados y audífonos de diadema. Vista: frente a la cámara, sin audífonos.</p>
+      <p>La cámara y el micrófono se procesan en tu equipo; no se graba ni se envía nada.</p>
+      <button id="btn-inicio" type="button">EMPEZAR</button>
+    </div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
