@@ -63,13 +63,12 @@ Cópialo a este proyecto (`src/lsm/` + `public/mediapipe/hand_landmarker.task` +
 2. **Plan corto y aprobación.** Presenta el plan por hitos y espera el visto bueno antes de programar.
 3. **Contratos antes que código.** Para trabajo en paralelo, escribe primero los contratos entre módulos (`docs/CONTRATOS.md`): tipos de mensajes del bus, eventos, interfaces de cada sistema y quién es dueño de qué archivo.
 4. **Subagentes en paralelo**, cada uno con archivos propios que no se pisen:
-   - Opus para sistemas, 3D, audio espacial, red y lógica del monstruo.
-   - Sonnet para contenido, textos, datos y ajustes sencillos.
+   - Varía el modelo según el trabajo: **Fable 5.2** para lo más difícil o central (simulación, lógica del monstruo, 3D, integración) y **Opus 5.5** para sistemas bien acotados por los contratos (audio espacial, radio, micrófono, red, contenido).
    - Si un subagente necesita tocar archivos de otro, se integra después; nunca dos escritores sobre el mismo archivo.
 5. **Integrar y probar en el navegador.** Abre el juego con el preview, juega el reto completo, revisa la consola y arregla. Las pruebas automáticas cubren la lógica (movimiento por casillas, ruido, monstruo, bus de mensajes); el audio y el 3D se verifican jugando.
 6. **Documentar.** Actualiza `docs/DISENO.md` si cambia el diseño y la tabla de estado (§6) al cerrar cada hito.
 7. **Git:**
-   - Commits pequeños y frecuentes **en español**, terminados en `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`.
+   - Commits pequeños y frecuentes **en español**, terminados en `Co-Authored-By:` con **el modelo de la sesión que hace el commit** (por ejemplo `Co-Authored-By: Claude Fable 5.2 <noreply@anthropic.com>`).
    - `git pull` antes de cada `push`. **Nunca `push --force`.** No reescribas historial subido.
    - **No hagas merges entre ramas ni a `main` sin autorización explícita.**
    - El repositorio remoto todavía no existe: pregúntale al equipo antes de crearlo o conectarlo.

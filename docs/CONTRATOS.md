@@ -81,7 +81,12 @@ Todos los sistemas con pantalla o sonido devuelven un `Sistema` (`actualizar(dtS
 |---|---|---|
 | Simulación | `src/sim/Simulacion.ts` | `new Simulacion(bus, mapa, config)` · `actualizar(dtSeg)` · `estado: EstadoJuego` (solo lectura) |
 | Mapa del ala este | `src/data/alaEste.ts` | `export const ALA_ESTE: Mapa` |
-| Consultas del mapa | `src/shared/mapaUtil.ts` | `esPared(mapa, puertas, cx, cz)` · `cuartoEn(mapa, pos)` · `hayPared(mapa, puertas, a, b)` (línea de vista, para la oclusión) |
+| Consultas del mapa | `src/shared/mapaUtil.ts` | `esPared(mapa, puertas, cx, cz)` · `chocaCirculo(mapa, puertas, pos, radio)` · `cuartoEn(mapa, pos)` · `hayPared(mapa, puertas, a, b)` (línea de vista, para la oclusión) · `vectorDeRumbo` · `rumboHacia` · `distancia` |
+
+Valores propios de un módulo que no estén en `src/config.ts` van en un archivo `ajustes.ts` dentro de la carpeta del módulo (nunca números sueltos en la lógica); la integración los pasa después a `config.ts` si conviene.
+
+| | | |
+|---|---|---|
 | Cliente Oído (pantalla y controles) | `src/oido/index.ts` | `crearClienteOido(bus, contenedor, mapa): Sistema` |
 | Cliente Vista (cámaras, mapa, HUD) | `src/vista/index.ts` | `crearClienteVista(bus, contenedor, mapa): Sistema` |
 | Mundo 3D compartido | `src/mundo3d/index.ts` | `construirMundo(mapa): { escena, actualizar(estado) }` (geometría y texturas PSX; lo usan las dos pantallas, cada una con su escena) |
@@ -110,9 +115,9 @@ Nunca dos escritores sobre el mismo archivo. Si necesitas algo de otro dueño, p
 
 | Carpeta o archivo | Dueño | Hito |
 |---|---|---|
-| `src/shared/contratos.ts`, `src/bus/`, `src/main.ts`, `index.html`, `package.json`, `docs/` | **Integración** (sesión principal) | 0 |
+| `src/shared/` (`contratos.ts`, `mapaUtil.ts`), `src/data/alaEste.ts`, `src/bus/`, `src/main.ts`, `index.html`, `package.json`, `docs/`, `test/bus.test.ts`, `test/mapa.test.ts` | **Integración** (sesión principal) | 0 |
 | `src/config.ts` | Integración. Cada dueño propone los valores de **su sección** | 0 |
-| `src/sim/`, `src/data/`, `src/shared/mapaUtil.ts`, `test/sim/` | Simulación | 1 y 5 |
+| `src/sim/`, `test/sim/` | Simulación | 1 y 5 |
 | `src/mundo3d/`, `src/oido/`, `src/vista/` | Pantallas | 2 |
 | `src/audio/` | Audio | 3 |
 | `src/radio/`, `test/radio/` | Radio | 4 |
