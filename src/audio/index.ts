@@ -348,9 +348,6 @@ export function crearAudio(bus: Bus, mapa: Mapa, ctx: AudioContext, voz: VozRadi
         finalSonado = false;
         agarrados.clear();
       }
-      if (e.fase === 'jugando' && (previa === null || previa === 'inicio')) {
-        radio.encolar({ texto: A.narracionInicial, emergencia: false, radio: false });
-      }
       if ((e.fase === 'ganaron' || e.fase === 'perdieron') && previa !== e.fase) radio.limpiar();
       if (primero) {
         colocarOyente(e.oido.pos, e.oido.rumbo, true);

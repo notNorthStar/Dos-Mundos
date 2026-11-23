@@ -193,7 +193,7 @@ Oído no la ve, pero el público sí.
 
 **La partida:**
 1. **Despertar.**
-   - Oído oye una narración: "Despiertas en la oscuridad. Algo respira en el edificio".
+   - Sin narración al inicio (el equipo la quitó el 2026-11-23): Oído empieza oyendo solo el edificio.
    - Vista ve la cámara 1: Oído en el piso y, a su derecha, una mesa con el decibelímetro.
 2. **Tutorial del ruido.**
    - Vista arma `R` → Enter. Oído oye por el radio "Gira a la derecha" y gira 90° con una pulsación de `→`.

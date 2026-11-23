@@ -6,8 +6,6 @@
  * Los "tau" son constantes de tiempo de setTargetAtTime: a 3·tau se llega al ~95 % del valor.
  */
 export const AJUSTES_AUDIO = {
-  /** Narración al pasar de 'inicio' a 'jugando' (DISENO.md §10, paso 1). */
-  narracionInicial: 'Despiertas en la oscuridad. Algo respira en el edificio.',
 
   /** Altura de cada cosa que suena, en metros (y). */
   alturas: {
