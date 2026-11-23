@@ -94,7 +94,7 @@ Cópialo a este proyecto (`src/lsm/` + `public/mediapipe/hand_landmarker.task` +
 | · Hito 4: radio (señas, números con dedos, voz) | 🔨 Código hecho | Probado con teclado. **Falta probar con cámara**: señas sostenidas, conteo de dedos y S de emergencia |
 | · Hito 5: ruido y monstruo | 🔨 Código hecho | Lógica probada. **Falta probar el micrófono real** y su calibración |
 | · Hito 6: partida completa | 🔨 | Se gana de principio a fin con teclado en el navegador. Falta la partida real con dos personas, tutorial guiado y punto de control |
-| Dos PC en red | 🔨 Código hecho (2026-11-23) | `npm run red`; `docs/CONTRATOS.md` §7. Probado con dos pestañas y por HTTPS en una PC. **Falta probarlo con dos PC reales** (firewall de Windows, hotspot) |
+| Dos PC en red | ✅ 2026-11-23 | `npm run red`; `docs/CONTRATOS.md` §7. **Probado con dos PC reales por hotspot** y aprobado por la profesora. La red de la escuela aísla los equipos: usar hotspot |
 | Fase 2: ecolocalización, transcripción, Vosk | ⬜ | |
 | Pulsera háptica (Arduino) | ⬜ | El equipo tiene un Arduino; plan en `docs/DISENO.md` §8 |
 | Pulido para el foro | ⬜ | |

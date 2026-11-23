@@ -25,6 +25,11 @@
 **Qué resultó:** bus de red (`src/bus/BusRed.ts`, `src/shared/red.ts`), relevo WebSocket como plugin de Vite (`tools/relevo.ts`), `npm run red` con HTTPS, selector de modo en la pantalla de inicio (`index.html`, `src/main.ts`) y 9 pruebas nuevas (136 en total). Probado con dos pestañas en una PC; falta con dos equipos.
 **Qué decidió o modificó el equipo:** en el foro las PC se conectan por hotspot o router propio; en dos PC solo cuenta el micrófono de Oído. Del MVP en una PC: el audio «estaba muy bueno» y el micrófono funcionó.
 
+## 2026-11-23 · Claude Code (Anthropic, Claude Fable 5.2) · Prueba con dos PC
+**Qué se pidió:** levantar el servidor para probar con dos PC y publicar el repositorio.
+**Qué resultó:** repositorio público en GitHub; aviso cuando falta la voz en español; partida jugada entre dos PC conectadas al hotspot de un celular.
+**Qué decidió o modificó el equipo:** quitó la narración inicial; usó hotspot porque la red de la escuela separa los equipos; la profesora aprobó el avance. Sigue el pulido.
+
 <!-- Plantilla:
 ## AAAA-MM-DD · <herramienta>
 **Qué se pidió:**
