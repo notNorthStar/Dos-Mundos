@@ -16,7 +16,7 @@ import { LsmEngine } from './lsm';
 import muestras from './lsm/data/samples.json';
 import { crearClienteOido } from './oido';
 import { crearPanelRadio } from './radio';
-import { crearVozSintetica } from './radio/voz';
+import { crearVozSintetica, hayVozParaElRadio } from './radio/voz';
 import { crearMicrofono, type Microfono } from './ruido/microfono';
 import type { Bus, Fase, Sistema } from './shared/contratos';
 import { RUTA_RELEVO } from './shared/red';
@@ -36,9 +36,9 @@ const aviso = $('aviso');
 const fin = $('fin');
 
 /** Dos avisos independientes: el de dispositivos (pasajero) y el de la conexión (mientras dure). */
-const avisos = { dispositivos: '', red: '' };
+const avisos = { dispositivos: '', red: '', voz: '' };
 function pintarAvisos(): void {
-  const texto = [avisos.red, avisos.dispositivos].filter(Boolean).join(' · ');
+  const texto = [avisos.red, avisos.dispositivos, avisos.voz].filter(Boolean).join(' · ');
   aviso.textContent = texto;
   aviso.hidden = texto === '';
 }
@@ -111,6 +111,11 @@ async function arrancar(modo: Modo, conDispositivos: boolean): Promise<void> {
     // El audio va en la PC de Oído: Vista no oye el juego (DISENO.md §2).
     sistemas.push(crearAudio(bus, mapa, ctx, crearVozSintetica()));
     conectarRuidoSimulado(microfono);
+    void hayVozParaElRadio().then((hay) => {
+      if (hay) return;
+      // Se queda fijo: sin voz en español el radio no se entiende y hay que arreglarlo en Windows.
+      avisar('voz', 'Esta PC no tiene voz en español: el radio sonará con acento inglés. Instálala en Configuración de Windows → Hora e idioma → Voz → Agregar voces → Español (México), y reinicia Chrome.');
+    });
   }
   if (juegaVista) {
     const vista = crearClienteVista(bus, $('vista'), mapa);

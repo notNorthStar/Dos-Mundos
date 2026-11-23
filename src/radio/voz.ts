@@ -148,3 +148,27 @@ export function crearVozSintetica(): VozRadio {
     },
   };
 }
+
+/**
+ * ¿Esta PC tiene alguna voz en el idioma del radio? Sin ella el navegador lee el español con una
+ * voz en inglés y no se entiende. Las voces cargan tarde en Chrome: se espera un momento antes de
+ * decidir. Resuelve `true` si no hay speechSynthesis (no hay nada que avisar).
+ */
+export function hayVozParaElRadio(msEspera = 1500): Promise<boolean> {
+  const synth = typeof window !== 'undefined' && 'speechSynthesis' in window ? window.speechSynthesis : null;
+  if (!synth) return Promise.resolve(true);
+  const hay = (): boolean => elegirVoz(synth.getVoices(), CONFIG.radio.voz.idioma) !== null;
+  if (hay()) return Promise.resolve(true);
+  return new Promise((resolver) => {
+    const fin = (): void => {
+      synth.removeEventListener('voiceschanged', alCambiar);
+      clearTimeout(reloj);
+      resolver(hay());
+    };
+    const alCambiar = (): void => {
+      if (hay()) fin();
+    };
+    const reloj = setTimeout(fin, msEspera);
+    synth.addEventListener('voiceschanged', alCambiar);
+  });
+}
