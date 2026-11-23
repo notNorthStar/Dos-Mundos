@@ -8,6 +8,8 @@ Listick Games.
 |---|---|---|---|
 | Three.js | three.js authors | MIT | Motor 3D |
 | MediaPipe Tasks Vision y modelo `hand_landmarker.task` | Google | Apache 2.0 | Detección de la mano para las señas |
+| ws | Einar Otto Stangvik y colaboradores | MIT | WebSocket del relevo entre las dos PC |
+| @vitejs/plugin-basic-ssl | Equipo de Vite | MIT | Certificado propio para HTTPS en la red local |
 | Vite, TypeScript, Vitest | Sus respectivos autores | MIT / Apache 2.0 | Herramientas de desarrollo |
 
 ## Código propio reutilizado

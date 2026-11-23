@@ -20,6 +20,11 @@
 **Qué resultó:** mapa del ala este y utilidades (sesión principal); simulación con movimiento, puertas, ruido y monstruo (`src/sim/`, Fable 5.2); mundo 3D PSX, pantalla de Oído y cámaras VHS de Vista (`src/mundo3d/`, `src/oido/`, `src/vista/`, Fable 5.2); audio espacial sintetizado por código y micrófono (`src/audio/`, `src/ruido/`, Opus 5.5); panel del radio, conteo de dedos y voz sintética (`src/radio/`, Opus 5.5); integración en `src/main.ts`. 127 pruebas de lógica en verde y partida ganada en el navegador con teclado.
 **Qué decidió o modificó el equipo:** firma de commits según el modelo de la sesión; subagentes repartidos entre Fable 5.2 y Opus 5.5. Pendiente del equipo: probar con audífonos, cámara y micrófono.
 
+## 2026-11-23 · Claude Code (Anthropic, Claude Fable 5.2) · Dos PC en red
+**Qué se pidió:** el equipo probó el MVP y pidió la versión de dos PC antes de seguir probando.
+**Qué resultó:** bus de red (`src/bus/BusRed.ts`, `src/shared/red.ts`), relevo WebSocket como plugin de Vite (`tools/relevo.ts`), `npm run red` con HTTPS, selector de modo en la pantalla de inicio (`index.html`, `src/main.ts`) y 9 pruebas nuevas (136 en total). Probado con dos pestañas en una PC; falta con dos equipos.
+**Qué decidió o modificó el equipo:** en el foro las PC se conectan por hotspot o router propio; en dos PC solo cuenta el micrófono de Oído. Del MVP en una PC: el audio «estaba muy bueno» y el micrófono funcionó.
+
 <!-- Plantilla:
 ## AAAA-MM-DD · <herramienta>
 **Qué se pidió:**

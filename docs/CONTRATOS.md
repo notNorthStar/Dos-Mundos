@@ -119,6 +119,7 @@ Nunca dos escritores sobre el mismo archivo. Si necesitas algo de otro dueño, p
 |---|---|---|
 | `src/shared/` (`contratos.ts`, `mapaUtil.ts`), `src/data/alaEste.ts`, `src/bus/`, `src/main.ts`, `index.html`, `package.json`, `docs/`, `test/bus.test.ts`, `test/mapa.test.ts` | **Integración** (sesión principal) | 0 |
 | `src/config.ts` | Integración. Cada dueño propone los valores de **su sección** | 0 |
+| `src/bus/BusRed.ts`, `src/shared/red.ts`, `tools/relevo.ts`, `test/red/` | Integración | Dos PC |
 | `src/sim/`, `test/sim/` | Simulación | 1 y 5 |
 | `src/mundo3d/`, `src/oido/`, `src/vista/` | Pantallas | 2 |
 | `src/audio/` | Audio | 3 |
@@ -126,8 +127,24 @@ Nunca dos escritores sobre el mismo archivo. Si necesitas algo de otro dueño, p
 | `src/ruido/` | Micrófono | 5 |
 | `src/lsm/` | **Nadie**: es el módulo de ECOS tal cual. No se cambian reglas ni umbrales |  |
 
-## 7. Pruebas
+## 7. Dos PC en red
+
+- **Mismo juego, otro bus.** `src/bus/BusRed.ts` implementa `Bus`: reparte dentro de la página como `BusLocal` y además manda por WebSocket lo que le toca a su rol. Ningún sistema cambia.
+- **Relevo.** `tools/relevo.ts` es un plugin de Vite: abre el WebSocket en `/bus`, en el mismo servidor y puerto que la página (desarrollo y `vite preview`). Solo reenvía de una PC a la otra; no conoce el juego. Un jugador por rol: si entra otro con el mismo rol, sale el anterior.
+- **Qué viaja** (`viajaDesde` en `src/shared/red.ts`, validado también en el relevo):
+
+| Rol | Corre | Envía por la red | Se queda en su PC |
+|---|---|---|---|
+| `oido` | Simulación, cliente de Oído, audio, micrófono | `sim/*`, `juego/*` | `oido/*`, `ruido/*` |
+| `vista` | Cliente de Vista, panel del radio, LSM | `vista/*`, `radio/*`, `juego/*` | — |
+
+- **Tramas** (JSON de texto): del navegador `{c:'hola', rol}` y `{c:'msg', tipo, datos}`; del relevo `{c:'presentes', roles}` y `{c:'msg', tipo, datos}`.
+- **Inicio.** Solo la PC de Oído envía `juego/iniciar`, cuando el relevo anuncia que Vista está presente. Si Vista entra tarde o recarga, se pone al día con el siguiente `sim/estado`.
+- **HTTPS.** `npm run red` (modo `red` de Vite) sirve con certificado propio (`@vitejs/plugin-basic-ssl`): Chrome solo da cámara y micrófono a páginas seguras, y Vista entra por IP.
+- **Modo.** La pantalla de inicio lo pregunta; `?rol=oido` o `?rol=vista` en la dirección lo deja preseleccionado.
+
+## 8. Pruebas
 
 - `npm test` corre Vitest sobre `test/**/*.test.ts` en Node, sin navegador.
-- Cubren la lógica: bus, movimiento y colisiones, ruido, estados del monstruo, objetos y fin de partida, composición de mensajes del radio y conteo de dedos.
+- Cubren la lógica: bus local y de red, relevo, movimiento y colisiones, ruido, estados del monstruo, objetos y fin de partida, composición de mensajes del radio y conteo de dedos.
 - El audio y el 3D se verifican jugando en Chrome con audífonos.

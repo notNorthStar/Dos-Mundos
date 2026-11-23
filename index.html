@@ -21,6 +21,13 @@
         background: #0c0f0c; color: #cfd6cf; border: 1px solid #5a665a; cursor: pointer; }
       #inicio button:hover, #fin button:hover { background: #1a201a; }
       #inicio .secundario { font-size: 13px; padding: 8px 20px; opacity: 0.8; }
+      #modos { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; }
+      #modos button { font-size: 13px; letter-spacing: 2px; padding: 8px 16px; opacity: 0.6; }
+      #modos button[aria-pressed='true'] { opacity: 1; border-color: #cfd6cf; background: #1a201a; }
+      /* Dos PC: cada una muestra solo su mitad, a pantalla completa. */
+      body[data-modo='oido'] #vista, body[data-modo='vista'] #oido { display: none; }
+      body[data-modo='oido'] #oido { border-right: 0; }
+      body[data-modo='oido'] #fin, body[data-modo='vista'] #fin { left: 50%; }
       #aviso { position: fixed; top: 12px; left: 50%; transform: translateX(-50%); z-index: 8;
         max-width: 80vw; padding: 8px 16px; font-size: 13px; text-align: center;
         background: rgba(0, 0, 0, 0.85); border: 1px solid #5a665a; }
@@ -39,6 +46,12 @@
       <h1>DOS MUNDOS</h1>
       <p>Para dos personas. Oído: ojos vendados y audífonos de diadema. Vista: frente a la cámara, sin audífonos.</p>
       <p>La cámara y el micrófono se procesan en tu equipo; no se graba ni se envía nada.</p>
+      <div id="modos" role="group" aria-label="Modo de juego">
+        <button type="button" data-modo="solo">UNA PC</button>
+        <button type="button" data-modo="oido">DOS PC · SOY OÍDO</button>
+        <button type="button" data-modo="vista">DOS PC · SOY VISTA</button>
+      </div>
+      <p id="nota-modo"></p>
       <button id="btn-inicio" type="button">EMPEZAR</button>
       <button id="btn-teclado" class="secundario" type="button">SIN CÁMARA NI MICRÓFONO (SOLO TECLADO)</button>
     </div>

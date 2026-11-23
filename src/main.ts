@@ -1,9 +1,15 @@
 /**
  * Integración: crea el bus, la simulación y los clientes, y los hace avanzar una vez por cuadro.
  * Los módulos no se conocen entre sí; solo comparten el bus (docs/CONTRATOS.md).
+ *
+ * Tres modos (docs/CONTRATOS.md §7):
+ *  - `solo`: una PC, pantalla y teclado divididos, bus en memoria.
+ *  - `oido`: dos PC. Esta corre la simulación, el audio y el micrófono.
+ *  - `vista`: dos PC. Esta muestra las cámaras y arma los mensajes del radio con la cámara.
  */
 import { crearAudio } from './audio';
 import { BusLocal } from './bus/BusLocal';
+import { BusRed, enchufeWeb, urlRelevo } from './bus/BusRed';
 import { CONFIG } from './config';
 import { ALA_ESTE } from './data/alaEste';
 import { LsmEngine } from './lsm';
@@ -11,10 +17,13 @@ import muestras from './lsm/data/samples.json';
 import { crearClienteOido } from './oido';
 import { crearPanelRadio } from './radio';
 import { crearVozSintetica } from './radio/voz';
-import { crearMicrofono } from './ruido/microfono';
-import type { Fase, Sistema } from './shared/contratos';
+import { crearMicrofono, type Microfono } from './ruido/microfono';
+import type { Bus, Fase, Sistema } from './shared/contratos';
+import { RUTA_RELEVO } from './shared/red';
 import { Simulacion } from './sim/Simulacion';
 import { crearClienteVista } from './vista';
+
+type Modo = 'solo' | 'oido' | 'vista';
 
 const $ = <T extends HTMLElement>(id: string): T => {
   const el = document.getElementById(id);
@@ -26,9 +35,16 @@ const inicio = $('inicio');
 const aviso = $('aviso');
 const fin = $('fin');
 
-function mostrarAviso(texto: string): void {
+/** Dos avisos independientes: el de dispositivos (pasajero) y el de la conexión (mientras dure). */
+const avisos = { dispositivos: '', red: '' };
+function pintarAvisos(): void {
+  const texto = [avisos.red, avisos.dispositivos].filter(Boolean).join(' · ');
   aviso.textContent = texto;
   aviso.hidden = texto === '';
+}
+function avisar(cual: keyof typeof avisos, texto: string): void {
+  avisos[cual] = texto;
+  pintarAvisos();
 }
 
 function bloquearTeclasDelNavegador(): void {
@@ -41,28 +57,67 @@ function bloquearTeclasDelNavegador(): void {
 
 const radioAbierto = (): boolean => document.body.dataset.radioAbierto === '1';
 
-async function arrancar(conDispositivos: boolean): Promise<void> {
+/** N y M: ruido simulado, el respaldo cuando no hay micrófono (AGENTS.md §5). */
+function conectarRuidoSimulado(microfono: Microfono): void {
+  const { ruidoCuidado, ruidoPeligro } = CONFIG.teclas.general;
+  const simulando = new Set<string>();
+  const aplicar = (): void => {
+    microfono.nivelSimulado = simulando.has(ruidoPeligro)
+      ? CONFIG.ruido.simuladoPeligro
+      : simulando.has(ruidoCuidado)
+        ? CONFIG.ruido.simuladoCuidado
+        : 0;
+  };
+  window.addEventListener('keydown', (e) => {
+    if ((e.code === ruidoCuidado || e.code === ruidoPeligro) && !radioAbierto()) {
+      simulando.add(e.code);
+      aplicar();
+    }
+  });
+  window.addEventListener('keyup', (e) => {
+    if (simulando.delete(e.code)) aplicar();
+  });
+  window.addEventListener('blur', () => {
+    simulando.clear();
+    aplicar();
+  });
+}
+
+async function arrancar(modo: Modo, conDispositivos: boolean): Promise<void> {
   inicio.remove();
+  document.body.dataset.modo = modo;
   bloquearTeclasDelNavegador();
 
   const mapa = ALA_ESTE;
-  const bus = new BusLocal();
-  const ctx = new AudioContext();
-  void ctx.resume();
+  const red =
+    modo === 'solo'
+      ? null
+      : new BusRed({ rol: modo, crearEnchufe: () => enchufeWeb(urlRelevo(location, RUTA_RELEVO)) });
+  const bus: Bus = red ?? new BusLocal();
 
-  const sim = new Simulacion(bus, mapa);
-  const oido = crearClienteOido(bus, $('oido'), mapa);
-  const vista = crearClienteVista(bus, $('vista'), mapa);
-  const voz = crearVozSintetica();
-  const audio = crearAudio(bus, mapa, ctx, voz);
-  const microfono = crearMicrofono(bus, ctx);
+  const juegaOido = modo !== 'vista';
+  const juegaVista = modo !== 'oido';
+  const sistemas: Sistema[] = [];
+  let microfono: Microfono | null = null;
+  let lsm: LsmEngine | null = null;
 
-  // Sin cámara se juega igual: el panel del radio acepta el teclado (AGENTS.md §5).
-  const lsm = conDispositivos ? new LsmEngine({ samples: muestras.samples }) : null;
-  const radio = crearPanelRadio(bus, vista.panelRadio, lsm);
-
-  // La simulación va primero: los clientes dibujan y suenan lo que ella anuncia.
-  const sistemas: Sistema[] = [sim, microfono, oido, vista, radio, audio];
+  if (juegaOido) {
+    const ctx = new AudioContext();
+    void ctx.resume();
+    // La simulación va primero: los clientes dibujan y suenan lo que ella anuncia.
+    sistemas.push(new Simulacion(bus, mapa));
+    microfono = crearMicrofono(bus, ctx);
+    sistemas.push(microfono, crearClienteOido(bus, $('oido'), mapa));
+    // El audio va en la PC de Oído: Vista no oye el juego (DISENO.md §2).
+    sistemas.push(crearAudio(bus, mapa, ctx, crearVozSintetica()));
+    conectarRuidoSimulado(microfono);
+  }
+  if (juegaVista) {
+    const vista = crearClienteVista(bus, $('vista'), mapa);
+    // Sin cámara se juega igual: el panel del radio acepta el teclado (AGENTS.md §5).
+    lsm = conDispositivos ? new LsmEngine({ samples: muestras.samples }) : null;
+    sistemas.push(vista, crearPanelRadio(bus, vista.panelRadio, lsm));
+  }
 
   let fase: Fase = 'inicio';
   bus.escuchar('sim/estado', (e) => {
@@ -75,32 +130,10 @@ async function arrancar(conDispositivos: boolean): Promise<void> {
     if (fase === 'ganaron' || fase === 'perdieron') bus.enviar('juego/reiniciar', {});
   };
   $('btn-reiniciar').addEventListener('click', reiniciar);
-
-  // Teclas de la integración: reinicio y ruido simulado (respaldo sin micrófono).
-  const { reiniciar: teclaReiniciar, ruidoCuidado, ruidoPeligro } = CONFIG.teclas.general;
-  const simulando = new Set<string>();
-  const aplicarRuidoSimulado = (): void => {
-    microfono.nivelSimulado = simulando.has(ruidoPeligro)
-      ? CONFIG.ruido.simuladoPeligro
-      : simulando.has(ruidoCuidado)
-        ? CONFIG.ruido.simuladoCuidado
-        : 0;
-  };
   window.addEventListener('keydown', (e) => {
-    if (e.code === teclaReiniciar) {
-      e.preventDefault();
-      reiniciar();
-    } else if ((e.code === ruidoCuidado || e.code === ruidoPeligro) && !radioAbierto()) {
-      simulando.add(e.code);
-      aplicarRuidoSimulado();
-    }
-  });
-  window.addEventListener('keyup', (e) => {
-    if (simulando.delete(e.code)) aplicarRuidoSimulado();
-  });
-  window.addEventListener('blur', () => {
-    simulando.clear();
-    aplicarRuidoSimulado();
+    if (e.code !== CONFIG.teclas.general.reiniciar) return;
+    e.preventDefault();
+    reiniciar();
   });
 
   let antes = performance.now();
@@ -113,23 +146,55 @@ async function arrancar(conDispositivos: boolean): Promise<void> {
   };
   requestAnimationFrame(ciclo);
 
-  if (conDispositivos && lsm) {
-    mostrarAviso('Preparando la cámara y el micrófono…');
-    const [hayCamara, hayMicrofono] = await Promise.all([lsm.enableCamera(), microfono.iniciar()]);
-    if (hayMicrofono) {
-      mostrarAviso(`Calibrando el ruido del cuarto: ${CONFIG.ruido.segCalibracion} segundos de silencio, por favor.`);
+  if (conDispositivos) {
+    avisar('dispositivos', juegaOido && juegaVista ? 'Preparando la cámara y el micrófono…' : juegaOido ? 'Preparando el micrófono…' : 'Preparando la cámara…');
+    const [hayCamara, hayMicrofono] = await Promise.all([
+      lsm ? lsm.enableCamera() : Promise.resolve(false),
+      microfono ? microfono.iniciar() : Promise.resolve(false),
+    ]);
+    if (microfono && hayMicrofono) {
+      avisar('dispositivos', `Calibrando el ruido del cuarto: ${CONFIG.ruido.segCalibracion} segundos de silencio, por favor.`);
       await microfono.calibrar();
     }
     const faltan = [
-      hayCamara ? '' : 'Sin cámara: las señas se teclean (Tab abre el radio).',
-      hayMicrofono ? '' : 'Sin micrófono: el ruido solo viene del juego.',
+      juegaVista && !hayCamara ? 'Sin cámara: las señas se teclean (Tab abre el radio).' : '',
+      juegaOido && !hayMicrofono ? 'Sin micrófono: el ruido solo viene del juego.' : '',
     ].filter(Boolean);
-    mostrarAviso(faltan.join(' '));
-    if (faltan.length > 0) window.setTimeout(() => mostrarAviso(''), CONFIG.interfaz.msAviso);
+    avisar('dispositivos', faltan.join(' '));
+    if (faltan.length > 0) window.setTimeout(() => avisar('dispositivos', ''), CONFIG.interfaz.msAviso);
   }
 
-  bus.enviar('juego/iniciar', {});
+  if (!red) {
+    bus.enviar('juego/iniciar', {});
+    return;
+  }
+
+  // Dos PC: la partida empieza cuando están las dos. Si una se cae, se avisa y se sigue esperando.
+  const otra = modo === 'oido' ? 'Vista' : 'Oído';
+  red.alCambiar(({ conectado, otroPresente }) => {
+    avisar('red', !conectado ? 'Sin conexión con el servidor del juego. Reintentando…' : !otroPresente ? `Esperando a la PC de ${otra}…` : '');
+    // Solo la PC de Oído (la que simula) da la salida; la simulación ignora un segundo «iniciar».
+    if (modo === 'oido' && conectado && otroPresente) bus.enviar('juego/iniciar', {});
+  });
 }
 
-$('btn-inicio').addEventListener('click', () => void arrancar(true));
-$('btn-teclado').addEventListener('click', () => void arrancar(false));
+// ───────────────────────── Pantalla de inicio ─────────────────────────
+const NOTAS: Record<Modo, string> = {
+  solo: 'Las dos personas en esta PC: Oído a la izquierda, Vista a la derecha.',
+  oido: 'Esta PC es la de Oído: audífonos, micrófono, flechas y mouse. Aquí corre el juego.',
+  vista: 'Esta PC es la de Vista: cámaras, puertas y señas frente a la cámara. Sin audífonos.',
+};
+const pedido = new URLSearchParams(location.search).get('rol');
+let modo: Modo = pedido === 'oido' || pedido === 'vista' ? pedido : 'solo';
+
+const botonesModo = [...document.querySelectorAll<HTMLButtonElement>('#modos button')];
+function elegirModo(nuevo: Modo): void {
+  modo = nuevo;
+  for (const b of botonesModo) b.setAttribute('aria-pressed', String(b.dataset.modo === nuevo));
+  $('nota-modo').textContent = NOTAS[nuevo];
+}
+for (const b of botonesModo) b.addEventListener('click', () => elegirModo(b.dataset.modo as Modo));
+elegirModo(modo);
+
+$('btn-inicio').addEventListener('click', () => void arrancar(modo, true));
+$('btn-teclado').addEventListener('click', () => void arrancar(modo, false));

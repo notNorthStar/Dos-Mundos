@@ -36,7 +36,7 @@ Todo el detalle está en `docs/DISENO.md`. **Léelo antes de empezar.**
 | Señas | **Módulo `ecos-lsm`** del proyecto ECOS (ver §3) |
 | Voz | Radio: `speechSynthesis` (es-MX) en el MVP, detrás de una interfaz para cambiar después a clips grabados por el equipo y concatenados con WebAudio. Reconocimiento (fase 2): Web Speech API para prototipo; **Vosk** con gramática cerrada para el foro (sin internet) |
 | Ruido | Volumen del micrófono (RMS en dBFS) contra un ruido base calibrado al inicio |
-| Red | MVP: **una sola página** (pantalla y teclado divididos). Fase 2: **dos PC** con un servidor WebSocket mínimo en Node; la PC de Oído simula el juego y le manda el estado a Vista |
+| Red | **Una PC** (pantalla y teclado divididos) o **dos PC**: un relevo WebSocket dentro del servidor de Vite (`tools/relevo.ts`), por HTTPS con `npm run red`; la PC de Oído simula el juego y le manda el estado a Vista |
 | Háptica | Arduino + 2 motores de vibración, conectado por **Web Serial** (Chrome) a la PC de Oído. Fase 2 |
 | Pruebas | Windows, Chrome. Audífonos de diadema obligatorios para probar el audio 3D |
 
@@ -94,7 +94,8 @@ Cópialo a este proyecto (`src/lsm/` + `public/mediapipe/hand_landmarker.task` +
 | · Hito 4: radio (señas, números con dedos, voz) | 🔨 Código hecho | Probado con teclado. **Falta probar con cámara**: señas sostenidas, conteo de dedos y S de emergencia |
 | · Hito 5: ruido y monstruo | 🔨 Código hecho | Lógica probada. **Falta probar el micrófono real** y su calibración |
 | · Hito 6: partida completa | 🔨 | Se gana de principio a fin con teclado en el navegador. Falta la partida real con dos personas, tutorial guiado y punto de control |
-| Fase 2: dos PC en red, ecolocalización, transcripción, Vosk | ⬜ | |
+| Dos PC en red | 🔨 Código hecho (2026-11-23) | `npm run red`; `docs/CONTRATOS.md` §7. Probado con dos pestañas y por HTTPS en una PC. **Falta probarlo con dos PC reales** (firewall de Windows, hotspot) |
+| Fase 2: ecolocalización, transcripción, Vosk | ⬜ | |
 | Pulsera háptica (Arduino) | ⬜ | El equipo tiene un Arduino; plan en `docs/DISENO.md` §8 |
 | Pulido para el foro | ⬜ | |
 
@@ -104,7 +105,8 @@ Estados: ⬜ pendiente · 🔨 en curso · ✅ hecho.
 ```bash
 npm install      # la primera vez
 npm run dev      # desarrollo en http://localhost:5190 (copia antes el WASM de MediaPipe)
+npm run red      # dos PC: HTTPS y visible en la red local (ver docs/DISENO.md §6.2)
 npm run build    # revisa tipos y genera dist/
 npm test         # pruebas de lógica (Vitest, en test/)
 ```
-Preview de Claude Code: configuración **"Dos Mundos (dev)"** en `ClaudeCode\.claude\launch.json`.
+Preview de Claude Code: configuración **"Dos Mundos (dev)"** en `.claude/launch.json` de este proyecto (y también en el de la carpeta padre `ClaudeCode`, según desde dónde se abra la sesión).

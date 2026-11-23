@@ -114,7 +114,11 @@ Todas las teclas van en un archivo de configuración (`src/config.ts`). **Nunca 
 
 La pantalla de inicio ofrece dos modos: **Empezar** (pide cámara y micrófono y calibra 5 s de silencio) y **solo teclado** (sin cámara ni micrófono).
 
-### 6.2 Fase 2: dos PC
+### 6.2 Dos PC (hecho el 2026-11-23; falta probarlo con dos equipos reales)
+- En la pantalla de inicio se elige **Una PC**, **Dos PC · soy Oído** o **Dos PC · soy Vista**. Cada PC muestra solo su mitad, a pantalla completa.
+- La PC de Oído arranca el juego con `npm run red` y abre `https://localhost:5190`. La de Vista abre `https://<IP de la PC de Oído>:5190` en Chrome y acepta el aviso del certificado (es propio, de la red local). Las dos en la misma red: **hotspot o router propio**, no el wifi de la universidad.
+- **Solo el micrófono de Oído cuenta como ruido.** La PC de Vista usa la cámara, no el micrófono, y no reproduce audio.
+- La partida empieza cuando están las dos PC; si una se desconecta, la otra lo avisa y se reconecta sola.
 - **PC de Vista:** teclado completo para ella (`Enter` para enviar, como pidió el equipo). Cámara web enfrente.
 - **PC de Oído:** flechas, mouse y la pulsera por USB.
 - Se comunican por un servidor WebSocket en la red local. La PC de Oído simula el mundo; la de Vista recibe el estado unas 15 veces por segundo y manda los mensajes de radio y las órdenes de puertas.
@@ -226,6 +230,7 @@ Oído no la ve, pero el público sí.
 ## 12. Preguntas abiertas para el equipo
 Resueltas el 2026-11-19: Oído a la izquierda y Vista a la derecha · giro de 90° por pulsación · voz sintética en el MVP y clips grabados después · la seña **A** entra en el MVP.
 
+Resueltas el 2026-11-23: en dos PC solo cuenta el micrófono de Oído · en el foro las PC se conectan por hotspot o router propio.
+
 Pendientes:
-- ¿El micrófono de Vista cuenta como ruido en la versión de dos PC?
 - Nombre definitivo del juego.
