@@ -71,7 +71,7 @@ Cópialo a este proyecto (`src/lsm/` + `public/mediapipe/hand_landmarker.task` +
    - Commits pequeños y frecuentes **en español**, terminados en `Co-Authored-By:` con **el modelo de la sesión que hace el commit** (por ejemplo `Co-Authored-By: Claude Fable 5.2 <noreply@anthropic.com>`).
    - `git pull` antes de cada `push`. **Nunca `push --force`.** No reescribas historial subido.
    - **No hagas merges entre ramas ni a `main` sin autorización explícita.**
-   - El repositorio remoto todavía no existe: pregúntale al equipo antes de crearlo o conectarlo.
+   - Repositorio remoto (público, desde 2026-11-23): https://github.com/notNorthStar/Dos-Mundos, rama `main`.
 8. **Registro de IA obligatorio** en `AI_LOG.md` (fecha, herramienta, qué se pidió, qué resultó, qué decidió el equipo) y créditos de terceros en `CREDITOS.md`.
 9. Al cerrar una sesión: termina el paso actual, haz commit, actualiza §6 y di dónde te quedaste.
 
@@ -87,7 +87,7 @@ Cópialo a este proyecto (`src/lsm/` + `public/mediapipe/hand_landmarker.task` +
 |---|---|---|
 | Concepto y diseño | ✅ Definido (2026-11-19) | Ver `docs/DISENO.md` |
 | MVP: un reto, una PC, pantalla dividida | 🔨 En curso | Alcance en `docs/DISENO.md` §9. Hitos abajo |
-| · Hito 0: base (Vite, Three.js, `src/lsm/`, bus local, contratos) | ✅ 2026-11-19 | `docs/CONTRATOS.md`; git solo local, sin remoto |
+| · Hito 0: base (Vite, Three.js, `src/lsm/`, bus local, contratos) | ✅ 2026-11-19 | `docs/CONTRATOS.md` |
 | · Hito 1: mundo y simulación | ✅ 2026-11-19 | `src/sim/`, `src/data/alaEste.ts`; 51 pruebas |
 | · Hito 2: pantallas (Oído en tinieblas, cámaras VHS de Vista) | ✅ 2026-11-19 | Visto en el navegador. Falta: pointer lock real y medir FPS en la PC del foro |
 | · Hito 3: audio 3D | 🔨 Código hecho | **Nadie lo ha oído todavía**: falta probar con audífonos de diadema y ajustar volúmenes |
