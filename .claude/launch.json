@@ -6,6 +6,13 @@
       "runtimeExecutable": "npm",
       "runtimeArgs": ["run", "dev", "--", "--port", "5190", "--strictPort"],
       "port": 5190
+    },
+    {
+      "name": "Dos Mundos (red)",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "red", "--", "--port", "5190", "--strictPort"],
+      "port": 5190,
+      "url": "https://localhost:5190"
     }
   ]
 }
