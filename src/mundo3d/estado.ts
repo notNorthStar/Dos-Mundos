@@ -13,6 +13,7 @@ export function estadoInicial(mapa: Mapa): EstadoJuego {
     oido: {
       pos: { x: mapa.inicioOido.pos.x, z: mapa.inicioOido.pos.z },
       rumbo: mapa.inicioOido.rumbo,
+      cabeza: 0,
       cuartoId: cuartoEn(mapa, mapa.inicioOido.pos).id,
       corriendo: false,
       moviendose: false,

@@ -72,6 +72,7 @@ export class Simulacion {
       oido: {
         pos: { ...this.oido.pos },
         rumbo: this.oido.rumbo,
+        cabeza: 0,
         cuartoId: cuartoEn(this.mapa, this.oido.pos).id,
         corriendo: this.oido.corriendo,
         moviendose: this.oido.moviendose,

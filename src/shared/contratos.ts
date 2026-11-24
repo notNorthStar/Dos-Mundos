@@ -98,7 +98,14 @@ export interface EstadoJuego {
   fase: Fase;
   oido: {
     pos: Punto;
+    /** Hacia dónde apunta el cuerpo: siempre 0, 90, 180 o 270 al terminar un giro. */
     rumbo: number;
+    /**
+     * Giro de la cabeza respecto al cuerpo, en grados (+ = derecha), acotado por
+     * `CONFIG.movimiento.gradosCabezaMax`. La mirada y el oído apuntan a `rumbo + cabeza`;
+     * caminar siempre es hacia `rumbo`.
+     */
+    cabeza: number;
     cuartoId: string;
     corriendo: boolean;
     /** true mientras dura la animación de un paso o un giro. */
@@ -147,6 +154,7 @@ export interface Mensajes {
   /** Giro de CONFIG.movimiento.gradosPorGiro. */
   'oido/girar': { sentido: 'izq' | 'der' };
   /** Giro fino con el mouse, en grados (positivo = derecha). */
+  /** Mouse: gira solo la cabeza (`estado.oido.cabeza`), nunca el cuerpo. */
   'oido/girarFino': { grados: number };
   /** Clic izquierdo: agarra el objeto al alcance o usa la puerta de enfrente. */
   'oido/interactuar': Record<string, never>;
