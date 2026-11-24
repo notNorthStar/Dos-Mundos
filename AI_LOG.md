@@ -30,6 +30,11 @@
 **Qué resultó:** repositorio público en GitHub; aviso cuando falta la voz en español; partida jugada entre dos PC conectadas al hotspot de un celular.
 **Qué decidió o modificó el equipo:** quitó la narración inicial; usó hotspot porque la red de la escuela separa los equipos; la profesora aprobó el avance. Sigue el pulido.
 
+## 2026-11-24 · Claude Code (Fable 5.2 en la sesión principal; subagentes Fable 5.2 y Opus 5.5) y Gemini TTS · Correcciones tras jugar en dos PC
+**Qué se pidió:** el equipo reportó que el monstruo sonaba a ronroneo, que la voz seguía en inglés, que Oído se desorientaba y que nunca pudieron ganar; pidió movimiento de tablero, WASD, un monstruo que merodee y que Vista también oiga.
+**Qué resultó:** movimiento por casillas con cabeza independiente, WASD y monstruo que merodea con regla de esconderse (`src/sim/`, `src/oido/`, subagente Fable 5.2); voz del monstruo rehecha, reproductor de clips y audio de monitor para Vista (`src/audio/`, `src/radio/vozGrabada.ts`, subagente Opus 5.5); 23 clips de voz en español generados con Gemini TTS (`gemini-3.8-flash-lite-tts`, voz Algenib) en `public/radio/` con `tools/generar-voces.mjs`; integración y tecla F4 para recalibrar el micrófono. 182 pruebas en verde. Nadie ha oído todavía el resultado.
+**Qué decidió o modificó el equipo:** giros de 90° (no 45°); esconderse quieto y en silencio; Vista oye lo mismo que Oído; voz seria y tensa. La clave de la API la dio el equipo y se guarda fuera del repositorio.
+
 <!-- Plantilla:
 ## AAAA-MM-DD · <herramienta>
 **Qué se pidió:**

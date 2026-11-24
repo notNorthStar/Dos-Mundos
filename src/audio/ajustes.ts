@@ -80,14 +80,32 @@ export const AJUSTES_AUDIO = {
     /** A 4 m: retumbo grave, se percibe menos que su nivel. */
     pasoMonstruo: 12,
     pasoMonstruoRapido: 14,
-    respiracionPatrulla: 1.5,
-    respiracionCaza: 0.7,
-    grunido: 2.0,
+    // ── Voz del monstruo (rehecha el 2026-11-24, SIN MEDIR: estimados contra la respiración
+    // anterior, que medía ≈ 0.05–0.08 RMS antes de la distancia). Ajustar jugando con audífonos.
+    /** Patrulla: respiración trabajosa con formantes. */
+    respiroPatrulla: 1.6,
+    /** Caza: jadeo rápido. */
+    jadeo: 1.3,
+    /** Caza: gruñido gutural (tiene medios: se oye más que el viejo a igual ganancia). */
+    grunido: 0.6,
+    /** Patrulla: gorgoteo húmedo en la garganta. */
+    estertor: 1.4,
+    /** Patrulla: castañeteo seco (agudo: es lo que mejor se ubica en 3D). */
+    chasquidos: 0.6,
+    /** Patrulla: gemido grave con vibrato inestable. */
+    gemido: 0.6,
+    /** Escucha: olfateo corto. */
+    olfateo: 0.5,
+    /** Escucha: un clic aislado. */
+    clic: 0.5,
+    /** Caza: alarido disonante al empezar (suena una vez por caza). */
+    alarido: 0.6,
     faroDecibelimetro: 0.18,
     faroLlave: 0.7,
     latido: 0.08,
-    estaticaAtrapa: 0.15,
-    grito: 0.18,
+    estaticaAtrapa: 0.17,
+    /** En la cabeza (no 3D): cúmulo disonante + golpe grave. */
+    grito: 0.2,
     salida: 0.6,
     aire: 0.35,
   },
@@ -99,13 +117,52 @@ export const AJUSTES_AUDIO = {
     variacion: 0.15,
   },
 
+  /**
+   * Voz del monstruo. Los rangos [mín, máx] se sortean en cada evento: nada es periódico
+   * (un ritmo regular y grave es lo que sonaba a ronroneo).
+   */
   monstruo: {
-    segRespiroPatrulla: 4.2,
-    segRespiroCaza: 1.05,
-    /** Gruñidos sueltos durante la caza (además del que suena al entrar en caza). */
-    segGrunidoMin: 2.8,
-    segGrunidoMax: 5.5,
-    /** La respiración "se corta" al escuchar: rápido pero sin clic. */
+    patrulla: {
+      /** Duración de la inhalación (a veces en 2–3 tirones). */
+      segInhala: [0.6, 1.5] as const,
+      probInhalaEntrecortada: 0.3,
+      /** Hueco entre inhalar y exhalar. */
+      segHueco: [0.04, 0.4] as const,
+      segExhala: [0.9, 2.1] as const,
+      /** Probabilidad de que la exhalación lleve voz (carraspeo grave con aspereza). */
+      probVozAlExhalar: 0.45,
+      /** Probabilidad de que la exhalación acabe en estertor. */
+      probEstertorAlExhalar: 0.18,
+      /** Pausa tras cada respiro… */
+      segPausa: [0.4, 2.6] as const,
+      /** …y a veces una pausa larga, como si contuviera el aire. */
+      probPausaLarga: 0.18,
+      segPausaLarga: [3, 6] as const,
+      /** Ruidos sueltos (estertor, castañeteo, gemido) entre respiros. */
+      segEntreExtras: [2.5, 7.5] as const,
+      pesosExtras: { estertor: 1, chasquidos: 1.3, gemido: 0.8 },
+    },
+    escucha: {
+      /** Silencio tenso antes del primer olfateo o clic. */
+      segAntesPrimero: [0.9, 1.8] as const,
+      segEntre: [1.4, 3.4] as const,
+      probOlfateo: 0.65,
+    },
+    caza: {
+      /** El jadeo empieza cuando el alarido ya va bajando. */
+      segAntesJadeo: 1.1,
+      /** Pausa entre jadeos (además de lo que dura cada uno). */
+      segEntreJadeos: [0.02, 0.22] as const,
+      segEntreGrunidos: [1.6, 3.8] as const,
+    },
+    /** Arrastre tras cada paso del monstruo (nivel relativo al golpe del paso). */
+    arrastre: {
+      nivel: 0.07,
+      seg: [0.25, 0.55] as const,
+      /** Corriendo, solo arrastra a veces y más corto. */
+      probRapido: 0.45,
+    },
+    /** La voz "se corta" al escuchar: rápido pero sin clic. */
     tauCorte: 0.03,
     tauVuelta: 0.6,
     /** Tras volver de 'escucha', espera esto antes del primer respiro. */
@@ -157,6 +214,33 @@ export const AJUSTES_AUDIO = {
     segMargenVoz: 2,
     /** Máximo de mensajes en espera; los más viejos se descartan. */
     maxCola: 6,
+    /** Sin voz (PC de Vista, modo monitor): cuánto dura la estática de la transmisión. */
+    segEstaticaSinVoz: 0.7,
+    /**
+     * Cadena para la voz grabada (si la voz trae `salida`): mono → pasa-altas → realce de medios →
+     * pasa-bajas → saturación suave → volumen. La banda es la misma del radio (hzBajo–hzAlto).
+     */
+    voz: {
+      hzRealce: 1800,
+      dbRealce: 4,
+      /** Cantidad de la saturación tanh (1 = casi limpia, 3 = muy sucia). */
+      saturacion: 1.6,
+      volumen: 0.8,
+    },
+  },
+
+  /**
+   * Modo monitor (PC de Vista): toda la mezcla sale como por la bocina de la caseta de vigilancia.
+   * Mono, banda angosta y algo más baja.
+   */
+  monitor: {
+    hzBajo: 250,
+    hzAlto: 4500,
+    /** Resonancia de bocina chica. */
+    hzCaja: 1400,
+    dbCaja: 3,
+    volumen: 0.75,
+    mono: true,
   },
 
   /** Cuánto se adelanta la programación de los bucles respecto al reloj de audio. */

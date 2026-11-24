@@ -82,7 +82,7 @@ export interface Mapa {
   objetos: ObjetoDef[];
   inicioOido: { pos: Punto; rumbo: number };
   inicioMonstruo: Punto;
-  /** Centros de casilla que el monstruo recorre en orden y en ciclo. */
+  /** Centros de casilla entre los que el monstruo merodea: elige uno al azar, va, hace una pausa y elige otro. */
   rutaPatrulla: Punto[];
 }
 

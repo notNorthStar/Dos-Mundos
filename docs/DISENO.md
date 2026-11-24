@@ -22,7 +22,7 @@ En los documentos, **Jugador1** y **Jugador2** son las personas reales; **Vista*
 
 | | **Jugador1 · Vista** | **Jugador2 · Oído** |
 |---|---|---|
-| En la vida real | Frente a la pantalla y la cámara web. **Sin audífonos** | **Ojos vendados**, audífonos de diadema con micrófono, manos en flechas y mouse |
+| En la vida real | Frente a la pantalla y la cámara web. **Con audífonos** (desde 2026-11-24 también oye el edificio) | **Ojos vendados**, audífonos de diadema con micrófono, manos en WASD o flechas y mouse |
 | Ve | Las cámaras de seguridad (estilo VHS), el mapa, los objetos, las puertas y a Oído. **No ve al monstruo**: cuando está cerca, la cámara parpadea y mete estática | Nada |
 | Oye | Solo el cuarto real. **No oye el juego** | El juego en audio 3D: sus pasos, el monstruo, los objetos, su corazón, y el radio de Vista |
 | Habla | **No**. Si su micrófono detecta voz, cuenta como ruido `[PROPUESTA]` | Sí, pero el monstruo lo oye: tiene que susurrar |
@@ -65,7 +65,7 @@ Letras de LSM con significado en inglés y en español (en pantalla se ven los d
 | **R** | Right · Derecha | "Gira a la derecha" | 90°. Se confunde con U: por eso se confirma |
 | **U** | Up · Arriba | "Sube" | Solo cuando hay escaleras cerca |
 | **D** | Down · Abajo | "Agáchate, está en el piso" | |
-| **S** | Stop · Quieto | "Quieto. No hagas ruido" | Seña de emergencia |
+| **S** | Stop · Quieto | "Quieto, no hagas ruido" | Seña de emergencia. **Quieto y en silencio, el monstruo pasa de largo** |
 | **A** | Agarra | "Ahí está, agárralo" | Entra en el MVP |
 | **1–5** | Número | "uno"… "cinco" + "pasos" | Ver nota |
 
@@ -96,7 +96,14 @@ Letras de LSM con significado en inglés y en español (en pantalla se ven los d
 | **Caza** | Ruido en zona de peligro: va rápido al último punto de ruido | Oído: gruñido y pasos rápidos. Vista: estática fuerte |
 | **Atrapa** | Llega hasta Oído: **pierden** | Estática, grito y "Inténtenlo de nuevo". Sin gore |
 
-Si nadie hace ruido un rato, vuelve a patrullar. Vista puede **encerrarlo** cerrando una puerta, pero el portazo hace ruido: es una apuesta.
+Si nadie hace ruido un rato, vuelve a merodear. Vista puede **encerrarlo** cerrando una puerta, pero el portazo hace ruido: es una apuesta.
+
+**Reglas del monstruo desde el 2026-11-24** (el equipo nunca pudo pasar el nivel con las anteriores):
+- **Merodea**: elige un punto al azar entre los cuartos, camina hasta ahí, hace una pausa de 2 a 6 s y elige otro. Los primeros 20 s se queda en su guarida.
+- **Esconderse**: si Oído está **quieto y en silencio** (0.6 s sin moverse ni chocar, medidor en silencio), el monstruo pasa de largo aunque esté en su casilla. Lo atrapa si se mueve o hace ruido a menos de 0.8 m. Cazando atrapa por contacto siempre.
+- **Ruido en cuidado**: se detiene a escuchar; si el ruido sigue, va a investigar despacio el último punto donde lo oyó.
+- **Ruido en peligro**: caza hacia el **último punto donde oyó el ruido**, no hacia donde esté Oído ahora. Si no encuentra nada, busca 4 s y vuelve a merodear.
+- **Velocidades** (segundos por casilla): merodeo 1.0 · caza 0.45 · Oído caminando 0.55 · Oído corriendo 0.30 (correr hace ruido).
 
 ## 6. Controles
 
@@ -106,7 +113,7 @@ Dos ventanas no sirven (el teclado solo llega a la ventana activa), así que es 
 | Jugador | Teclas |
 |---|---|
 | **Vista** (lado izquierdo del teclado) | `1`–`5` cambian de cámara · `Tab` abre o cierra el detector de señas · `Retroceso` borra la última ficha · `Enter` envía · `P` abre o cierra la puerta de la cámara activa `[PROPUESTA]` · con el detector abierto, **teclear una letra** sustituye a la seña (respaldo sin cámara) |
-| **Oído** (flechas y mouse) | `↑` `↓` avanzar y retroceder · `←` `→` girar 90° (una pulsación = una orden de "gira" del radio) · mouse: giro fino · **clic izquierdo**: interactuar (agarrar, usar, abrir) · `Shift` derecho: correr (hace ruido) |
+| **Oído** (WASD o flechas, y mouse) | `W`/`↑` y `S`/`↓` avanzar y retroceder **una casilla** · `A`/`←` y `D`/`→` girar 90° (una pulsación = una orden de "gira" del radio) · mouse: gira **solo la cabeza** (hasta 60° a cada lado; vuelve al frente al caminar o girar) · `Shift`: correr · `F4`: recalibrar el micrófono · **clic izquierdo**: interactuar (agarrar, usar, abrir) · `Shift` derecho: correr (hace ruido) |
 
 | **Generales** | `F2` reintenta al ganar o perder · `N` y `M` (mantener) simulan ruido en zona de cuidado y de peligro, para probar sin micrófono |
 
@@ -120,7 +127,8 @@ La pantalla de inicio ofrece dos modos: **Empezar** (pide cámara y micrófono y
 - **Solo el micrófono de Oído cuenta como ruido.** La PC de Vista usa la cámara, no el micrófono, y no reproduce audio.
 - La partida empieza cuando están las dos PC; si una se desconecta, la otra lo avisa y se reconecta sola.
 - **PC de Vista:** teclado completo para ella (`Enter` para enviar, como pidió el equipo). Cámara web enfrente.
-- **PC de Oído:** flechas, mouse y la pulsera por USB.
+- **PC de Oído:** WASD o flechas, mouse y la pulsera por USB.
+- **Las dos PC reproducen audio.** Vista oye lo mismo que Oído (monstruo, pasos, latidos), con sonido de bocina de monitor y sin la voz del radio. **Vista también usa audífonos**: con bocinas, el micrófono de Oído las captaría como ruido.
 - Se comunican por un servidor WebSocket en la red local. La PC de Oído simula el mundo; la de Vista recibe el estado unas 15 veces por segundo y manda los mensajes de radio y las órdenes de puertas.
 
 ## 7. Pantallas
@@ -151,7 +159,7 @@ Oído no la ve, pero el público sí.
 **Entra:**
 - Una sola página: pantalla dividida (Oído a la izquierda, Vista a la derecha) y teclado dividido.
 - El **ala este** en 3D estilo PSX (§10), con 5 cámaras.
-- Movimiento de Oído con flechas y mouse, colisiones con paredes y pisadas por metro.
+- Movimiento de Oído por casillas, como en un tablero (WASD o flechas), giros de 90°, mouse solo para la cabeza, choques con paredes y pisadas por casilla.
 - Audio espacial: pasos, respiración del monstruo, tintineo de la llave, oclusión, reverberación por cuarto, corazón.
 - Radio: señas **F B L R S D A** y números, con confirmación y voz sintética con estática de radio. Respaldo con teclado.
 - Medidor de ruido con micrófono y calibración.
@@ -206,7 +214,7 @@ Oído no la ve, pero el público sí.
 4. **El monstruo.**
    - Oído empieza a oír una respiración que se acerca por su izquierda.
    - Vista no ve nada, pero la cámara 2 parpadea y mete estática.
-   - Vista sostiene **S**: "Quieto. No hagas ruido". Los dos aguantan en silencio unos 8 segundos mientras la respiración pasa.
+   - Vista sostiene **S**: "Quieto, no hagas ruido". Los dos aguantan en silencio unos 8 segundos mientras la respiración pasa.
    - Si alguien hace ruido, el monstruo entra en caza. Vista puede cerrar con `P` la puerta del cuarto 2 para encerrarlo, pero el portazo suena.
 5. **La llave.**
    - Vista guía por el pasillo hasta la bodega (cámara 4). A dos metros, Oído empieza a oír un tintineo débil.
@@ -231,6 +239,8 @@ Oído no la ve, pero el público sí.
 Resueltas el 2026-11-19: Oído a la izquierda y Vista a la derecha · giro de 90° por pulsación · voz sintética en el MVP y clips grabados después · la seña **A** entra en el MVP.
 
 Resueltas el 2026-11-23: en dos PC solo cuenta el micrófono de Oído · en el foro las PC se conectan por hotspot o router propio.
+
+Resueltas el 2026-11-24 (después de jugar en dos PC): movimiento de tablero con giros de 90° y mouse solo para la cabeza · WASD · el monstruo merodea y se le sobrevive quieto y en silencio · Vista oye lo mismo que Oído · la voz del radio son clips generados una vez (voz grave y tensa) y guardados en `public/radio/`.
 
 Pendientes:
 - Nombre definitivo del juego.

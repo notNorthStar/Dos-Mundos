@@ -3,13 +3,22 @@
  * monstruo, faros de los objetos, latido y radio. Todo sintetizado (sin archivos de audio).
  *
  * Grafo (ver mezcla.ts para el detalle de los buses):
- *   - Fuentes 3D persistentes (FuenteEspacial): monstruo (respiración + pasos + gruñidos),
- *     decibelímetro (faro) y llave (faro). Temporales: puertas, cerradura y salida.
+ *   - Fuentes 3D persistentes (FuenteEspacial): monstruo (voz + pasos), decibelímetro (faro) y
+ *     llave (faro). Temporales: puertas, cerradura y salida.
  *   - En la cabeza (mezcla.cabeza): pisadas, golpe, roce, objetos en la mano, grito.
  *   - Internos sin reverb (mezcla.interno): latido y estática al ser atrapado.
- *   - Radio (mezcla.radio): chasquidos y estática; agacha el resto (ducking).
+ *   - Radio (mezcla.radio): chasquidos, estática y la voz grabada si la hay; agacha el resto (ducking).
  *
- * Contrato: docs/CONTRATOS.md §4 · `crearAudio(bus, mapa, ctx, voz): Sistema`.
+ * Voz del monstruo según su estado (recetas en sonidos.ts, tiempos en ajustes.monstruo):
+ *   - patrulla: respiración trabajosa e irregular + estertores, castañeteos y gemidos sueltos.
+ *   - escucha:  la voz se corta; silencio con algún olfateo o clic aislado.
+ *   - caza:     alarido disonante al empezar, luego jadeo rápido y gruñidos guturales.
+ *   - atrapa:   estática y grito (final).
+ *
+ * El oyente mira hacia `rumbo + cabeza`: girar la cabeza con el mouse sirve para ubicar sonidos.
+ * Con `monitor` (PC de Vista) se oye lo mismo, desde Oído, como por la bocina de la caseta.
+ *
+ * Contrato: docs/CONTRATOS.md §4 · `crearAudio(bus, mapa, ctx, voz, opciones?): Sistema`.
  */
 import { CONFIG } from '../config';
 import type {
@@ -27,12 +36,26 @@ import { centroDe, distancia, hayPared } from '../shared/mapaUtil';
 import { AJUSTES_AUDIO } from './ajustes';
 import { FuenteEspacial } from './fuente3d';
 import { crearMezcla } from './mezcla';
-import { azar, limitar, Sintesis, variar, type Disparo } from './nucleo';
+import { elegir, entre, limitar, Sintesis, variar, type Disparo } from './nucleo';
 import { Programador } from './programador';
 import { ColaRadio } from './radio';
 import * as snd from './sonidos';
 
-type ModoRespiracion = 'patrulla' | 'caza' | 'callado';
+type ModoMonstruo = 'patrulla' | 'escucha' | 'caza' | 'callado';
+
+export interface OpcionesAudio {
+  /**
+   * PC de Vista: la misma mezcla oída desde Oído, por un filtro de bocina de monitor
+   * (ajustes.monitor). Los mensajes del radio no se dicen con voz: solo chasquido y estática.
+   */
+  monitor?: boolean;
+}
+
+/** Hacia dónde oye Oído: cuerpo + cabeza (la cabeza puede faltar si la simulación es vieja). */
+function orientacionOido(e: EstadoJuego): number {
+  const cabeza = e.oido.cabeza;
+  return e.oido.rumbo + (typeof cabeza === 'number' && Number.isFinite(cabeza) ? cabeza : 0);
+}
 
 /** Aplica un fundido solo si el objetivo cambió (evita llenar de eventos la línea de tiempo). */
 function crearFundido(aplicar: (v: number, tau: number) => void): (v: number, tau: number) => void {
@@ -44,11 +67,19 @@ function crearFundido(aplicar: (v: number, tau: number) => void): (v: number, ta
   };
 }
 
-export function crearAudio(bus: Bus, mapa: Mapa, ctx: AudioContext, voz: VozRadio): Sistema {
+export function crearAudio(
+  bus: Bus,
+  mapa: Mapa,
+  ctx: AudioContext,
+  voz: VozRadio | null,
+  opciones: OpcionesAudio = {},
+): Sistema {
   const A = AJUSTES_AUDIO;
+  const monitor = opciones.monitor === true;
   const s = new Sintesis(ctx);
-  const mezcla = crearMezcla(ctx);
-  const radio = new ColaRadio(s, mezcla, voz);
+  const mezcla = crearMezcla(ctx, { monitor });
+  // En el monitor de Vista el radio no habla: solo se oye que la transmisión salió.
+  const radio = new ColaRadio(s, mezcla, monitor ? null : voz);
 
   let estado: EstadoJuego | null = null;
   let faseAnterior: Fase | null = null;
@@ -116,15 +147,15 @@ export function crearAudio(bus: Bus, mapa: Mapa, ctx: AudioContext, voz: VozRadi
 
   const monstruo = nuevaFuente(mapa.inicioMonstruo, A.alturas.monstruo);
   const volMonstruo = crearFundido((v, tau) => monstruo.fundir(v, tau));
-  /** Sub-bus de la respiración: es lo que "se corta" en 'escucha'. */
-  const respiracion = ctx.createGain();
-  respiracion.gain.value = 0;
-  respiracion.connect(monstruo.entrada);
-  const volRespiracion = crearFundido((v, tau) => {
+  /** Sub-bus de la voz (respiración, gruñidos…): es lo que "se corta" en 'escucha'. */
+  const vozMonstruo = ctx.createGain();
+  vozMonstruo.gain.value = 0;
+  vozMonstruo.connect(monstruo.entrada);
+  const volVoz = crearFundido((v, tau) => {
     const ahora = ctx.currentTime;
-    respiracion.gain.cancelScheduledValues(ahora);
-    respiracion.gain.setValueAtTime(respiracion.gain.value, ahora);
-    respiracion.gain.setTargetAtTime(v, ahora, tau);
+    vozMonstruo.gain.cancelScheduledValues(ahora);
+    vozMonstruo.gain.setValueAtTime(vozMonstruo.gain.value, ahora);
+    vozMonstruo.gain.setTargetAtTime(v, ahora, tau);
   });
 
   const defDecibelimetro = mapa.objetos.find((o) => o.id === 'decibelimetro');
@@ -153,19 +184,55 @@ export function crearAudio(bus: Bus, mapa: Mapa, ctx: AudioContext, voz: VozRadi
   const temporales = new Set<FuenteEspacial>();
 
   // ───────────── Bucles ─────────────
-  let modoRespiracion: ModoRespiracion = 'callado';
-  let ultimoRespiro: Disparo | null = null;
+  const M = A.monstruo;
+  let modoMonstruo: ModoMonstruo = 'callado';
+  /**
+   * Estado del monstruo que manda en el audio. `sim/monstruoEstado` lo cambia al instante;
+   * `sim/estado` solo cuando su propio valor cambia (una foto atrasada no deshace el evento).
+   */
+  let estadoMonstruo: EstadoMonstruo = 'patrulla';
+  let ultimoDeLaFoto: EstadoMonstruo | null = null;
+  /** Lo que suena de la voz del monstruo: se corta al cambiar de modo (nada se encima). */
+  const vocesMonstruo = new Set<Disparo>();
+  const seguir = (v: snd.VozMonstruo): snd.VozMonstruo => {
+    for (const d of vocesMonstruo) if (!d.vivo) vocesMonstruo.delete(d);
+    vocesMonstruo.add(v.d);
+    return v;
+  };
+  const cortarVoces = (tau: number): void => {
+    for (const d of vocesMonstruo) d.cortar(tau);
+    vocesMonstruo.clear();
+  };
 
+  /** Patrulla: respiro trabajoso; caza: jadeo. Cada uno sortea su duración y la pausa siguiente. */
   const progRespiracion = new Programador(ctx, (t) => {
-    const modo = modoRespiracion === 'caza' ? 'caza' : 'patrulla';
-    ultimoRespiro = snd.respiro(s, respiracion, t, modo);
-    const base = modo === 'caza' ? A.monstruo.segRespiroCaza : A.monstruo.segRespiroPatrulla;
-    return variar(base, 0.08);
+    if (modoMonstruo === 'caza') {
+      const v = seguir(snd.jadeo(s, vozMonstruo, t));
+      return v.seg + entre(M.caza.segEntreJadeos);
+    }
+    const P = M.patrulla;
+    const v = seguir(snd.respiroPatrulla(s, vozMonstruo, t));
+    return v.seg + (Math.random() < P.probPausaLarga ? entre(P.segPausaLarga) : entre(P.segPausa));
+  });
+
+  /** Patrulla: estertor, castañeteo o gemido suelto, a intervalos al azar. */
+  const progExtras = new Programador(ctx, (t) => {
+    const cual = elegir(M.patrulla.pesosExtras);
+    const receta = cual === 'estertor' ? snd.estertor : cual === 'chasquidos' ? snd.chasquidos : snd.gemido;
+    const v = seguir(receta(s, vozMonstruo, t));
+    return v.seg + entre(M.patrulla.segEntreExtras);
+  });
+
+  /** Escucha: la voz está cortada; olfateos o clics sueltos directo a la fuente. */
+  const progEscucha = new Programador(ctx, (t) => {
+    const receta = Math.random() < M.escucha.probOlfateo ? snd.olfateo : snd.clic;
+    const v = seguir(receta(s, monstruo.entrada, t));
+    return v.seg + entre(M.escucha.segEntre);
   });
 
   const progGrunido = new Programador(ctx, (t) => {
-    snd.grunido(s, monstruo.entrada, t);
-    return azar(A.monstruo.segGrunidoMin, A.monstruo.segGrunidoMax);
+    const v = seguir(snd.grunido(s, vozMonstruo, t));
+    return v.seg + entre(M.caza.segEntreGrunidos);
   });
 
   const progFaroDec = new Programador(ctx, (t) => {
@@ -184,7 +251,8 @@ export function crearAudio(bus: Bus, mapa: Mapa, ctx: AudioContext, voz: VozRadi
     return 60 / bpm;
   });
 
-  const programadores = [progRespiracion, progGrunido, progFaroDec, progFaroLlave, progLatido];
+  const progsMonstruo = [progRespiracion, progExtras, progEscucha, progGrunido];
+  const programadores = [...progsMonstruo, progFaroDec, progFaroLlave, progLatido];
 
   function ritmoCardiaco(): { bpm: number; intensidad: number } {
     const H = A.latido;
@@ -196,29 +264,42 @@ export function crearAudio(bus: Bus, mapa: Mapa, ctx: AudioContext, voz: VozRadi
     return { bpm, intensidad };
   }
 
-  /** Cambia la respiración del monstruo según su estado (y la fase). */
-  function fijarModoRespiracion(modo: ModoRespiracion): void {
-    if (modo === modoRespiracion) return;
-    const veniaCallado = modoRespiracion === 'callado';
-    modoRespiracion = modo;
-    // El respiro en curso no debe encimarse con el nuevo ritmo ni reaparecer tras el silencio.
-    ultimoRespiro?.cortar(modo === 'callado' ? A.monstruo.tauCorte : 0.08);
-    ultimoRespiro = null;
-    if (modo === 'callado') {
-      volRespiracion(0, A.monstruo.tauCorte);
-      progRespiracion.parar();
-      progGrunido.parar();
-      return;
+  /** Cambia la voz del monstruo según su estado (y la fase). */
+  function fijarModo(modo: ModoMonstruo): void {
+    if (modo === modoMonstruo) return;
+    const anterior = modoMonstruo;
+    modoMonstruo = modo;
+    // Lo que sonaba no debe encimarse con el nuevo modo ni reaparecer tras el silencio.
+    cortarVoces(modo === 'caza' ? 0.05 : M.tauCorte);
+    for (const p of progsMonstruo) p.parar();
+    switch (modo) {
+      case 'callado':
+        volVoz(0, M.tauCorte);
+        return;
+      case 'escucha':
+        // Se corta la respiración: silencio tenso y, después, algún olfateo o clic.
+        volVoz(0, M.tauCorte);
+        progEscucha.arrancar(entre(M.escucha.segAntesPrimero));
+        return;
+      case 'patrulla': {
+        const deSilencio = anterior === 'callado' || anterior === 'escucha';
+        volVoz(1, deSilencio ? M.tauVuelta : 0.05);
+        progRespiracion.arrancar(deSilencio ? M.segPausaVuelta : 0.3);
+        progExtras.arrancar(entre(M.patrulla.segEntreExtras));
+        return;
+      }
+      case 'caza':
+        // El alarido lo dispara `sim/monstruoEstado`; el jadeo entra cuando va bajando.
+        volVoz(1, 0.02);
+        progRespiracion.arrancar(M.caza.segAntesJadeo);
+        progGrunido.arrancar(M.caza.segAntesJadeo + entre(M.caza.segEntreGrunidos) * 0.5);
+        return;
     }
-    volRespiracion(1, veniaCallado ? A.monstruo.tauVuelta : 0.05);
-    progRespiracion.reiniciar(veniaCallado ? A.monstruo.segPausaVuelta : 0.15);
-    if (modo === 'caza') progGrunido.arrancar(azar(A.monstruo.segGrunidoMin, A.monstruo.segGrunidoMax));
-    else progGrunido.parar();
   }
 
-  function modoDe(e: EstadoMonstruo, jugando: boolean): ModoRespiracion {
+  function modoDe(e: EstadoMonstruo, jugando: boolean): ModoMonstruo {
     if (!jugando) return 'callado';
-    return e === 'patrulla' ? 'patrulla' : e === 'caza' ? 'caza' : 'callado';
+    return e === 'patrulla' ? 'patrulla' : e === 'escucha' ? 'escucha' : e === 'caza' ? 'caza' : 'callado';
   }
 
   /** Enciende o apaga los bucles según el último estado. */
@@ -229,7 +310,7 @@ export function crearAudio(bus: Bus, mapa: Mapa, ctx: AudioContext, voz: VozRadi
     const tauFase = A.mezcla.tauFase;
 
     volMonstruo(jugando ? 1 : 0, tauFase);
-    fijarModoRespiracion(e ? modoDe(e.monstruo.estado, jugando) : 'callado');
+    fijarModo(e ? modoDe(estadoMonstruo, jugando) : 'callado');
 
     // Faro del decibelímetro.
     if (jugando && e && !tiene(e, 'decibelimetro') && faroDec) {
@@ -301,7 +382,7 @@ export function crearAudio(bus: Bus, mapa: Mapa, ctx: AudioContext, voz: VozRadi
     if (finalSonado) return;
     finalSonado = true;
     radio.limpiar();
-    fijarModoRespiracion('callado');
+    fijarModo('callado');
     const ahora = ctx.currentTime;
     snd.estatica(s, mezcla.interno, ahora, A.final.segEstatica);
     snd.grito(s, mezcla.cabeza, ahora + A.final.segAntesGrito);
@@ -328,6 +409,8 @@ export function crearAudio(bus: Bus, mapa: Mapa, ctx: AudioContext, voz: VozRadi
     estado = null;
     faseAnterior = 'inicio';
     finalSonado = false;
+    estadoMonstruo = 'patrulla';
+    ultimoDeLaFoto = null;
     agarrados.clear();
     pie = 1;
     actualizarBucles();
@@ -349,8 +432,12 @@ export function crearAudio(bus: Bus, mapa: Mapa, ctx: AudioContext, voz: VozRadi
         agarrados.clear();
       }
       if ((e.fase === 'ganaron' || e.fase === 'perdieron') && previa !== e.fase) radio.limpiar();
+      if (e.monstruo.estado !== ultimoDeLaFoto) {
+        ultimoDeLaFoto = e.monstruo.estado;
+        estadoMonstruo = e.monstruo.estado;
+      }
       if (primero) {
-        colocarOyente(e.oido.pos, e.oido.rumbo, true);
+        colocarOyente(e.oido.pos, orientacionOido(e), true);
         monstruo.colocar(e.monstruo.pos, true);
         segDesdeOclusion = Infinity;
       }
@@ -401,14 +488,17 @@ export function crearAudio(bus: Bus, mapa: Mapa, ctx: AudioContext, voz: VozRadi
 
     bus.escuchar('sim/monstruoEstado', (m) => {
       monstruo.colocar(m.pos);
+      estadoMonstruo = m.estado;
       if (m.estado === 'atrapa') {
         finalPerdieron();
         return;
       }
-      // La respiración sigue a `sim/estado` (estado continuo); aquí solo el instante de entrar en caza.
       const jugando = (!estado || estado.fase === 'jugando') && !finalSonado;
-      if (m.estado === 'caza' && m.anterior !== 'caza' && jugando) {
-        snd.grunido(s, monstruo.entrada, ahora());
+      if (!jugando) return;
+      // Cambia de modo ya (no espera a la siguiente foto) para que nada corte el alarido.
+      fijarModo(modoDe(m.estado, true));
+      if (m.estado === 'caza' && m.anterior !== 'caza') {
+        seguir(snd.alarido(s, vozMonstruo, ahora()));
       }
     }),
 
@@ -440,7 +530,7 @@ export function crearAudio(bus: Bus, mapa: Mapa, ctx: AudioContext, voz: VozRadi
     actualizar(dtSeg: number) {
       if (destruido) return;
       if (estado) {
-        colocarOyente(estado.oido.pos, estado.oido.rumbo, false);
+        colocarOyente(estado.oido.pos, orientacionOido(estado), false);
         monstruo.colocar(estado.monstruo.pos);
         const cuarto = mapa.cuartos.find((c) => c.id === estado!.oido.cuartoId);
         if (cuarto) mezcla.fijarReverb(cuarto.reverb);
@@ -459,12 +549,14 @@ export function crearAudio(bus: Bus, mapa: Mapa, ctx: AudioContext, voz: VozRadi
       destruido = true;
       for (const q of quitar) q();
       for (const p of programadores) p.parar();
-      radio.destruir();
+      radio.limpiar();
       mezcla.silenciar(true);
       s.cortarTodo(A.mezcla.tauCorte);
+      vocesMonstruo.clear();
       // Se desconecta tras el fundido de salida para no dejar un clic.
       window.setTimeout(() => {
-        respiracion.disconnect();
+        radio.destruir();
+        vozMonstruo.disconnect();
         busLatido.disconnect();
         for (const f of persistentes) f.destruir();
         for (const f of temporales) f.destruir();

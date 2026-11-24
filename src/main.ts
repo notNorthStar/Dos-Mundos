@@ -16,7 +16,8 @@ import { LsmEngine } from './lsm';
 import muestras from './lsm/data/samples.json';
 import { crearClienteOido } from './oido';
 import { crearPanelRadio } from './radio';
-import { crearVozSintetica, hayVozParaElRadio } from './radio/voz';
+import { crearVozSintetica } from './radio/voz';
+import { crearVozGrabada } from './radio/vozGrabada';
 import { crearMicrofono, type Microfono } from './ruido/microfono';
 import type { Bus, Fase, Sistema } from './shared/contratos';
 import { RUTA_RELEVO } from './shared/red';
@@ -36,9 +37,9 @@ const aviso = $('aviso');
 const fin = $('fin');
 
 /** Dos avisos independientes: el de dispositivos (pasajero) y el de la conexión (mientras dure). */
-const avisos = { dispositivos: '', red: '', voz: '' };
+const avisos = { dispositivos: '', red: '' };
 function pintarAvisos(): void {
-  const texto = [avisos.red, avisos.dispositivos, avisos.voz].filter(Boolean).join(' · ');
+  const texto = [avisos.red, avisos.dispositivos].filter(Boolean).join(' · ');
   aviso.textContent = texto;
   aviso.hidden = texto === '';
 }
@@ -108,20 +109,21 @@ async function arrancar(modo: Modo, conDispositivos: boolean): Promise<void> {
     sistemas.push(new Simulacion(bus, mapa));
     microfono = crearMicrofono(bus, ctx);
     sistemas.push(microfono, crearClienteOido(bus, $('oido'), mapa));
-    // El audio va en la PC de Oído: Vista no oye el juego (DISENO.md §2).
-    sistemas.push(crearAudio(bus, mapa, ctx, crearVozSintetica()));
+    // La voz del radio son clips grabados (public/radio); la sintética queda de respaldo si faltan.
+    sistemas.push(crearAudio(bus, mapa, ctx, crearVozGrabada(ctx, crearVozSintetica())));
     conectarRuidoSimulado(microfono);
-    void hayVozParaElRadio().then((hay) => {
-      if (hay) return;
-      // Se queda fijo: sin voz en español el radio no se entiende y hay que arreglarlo en Windows.
-      avisar('voz', 'Esta PC no tiene voz en español: el radio sonará con acento inglés. Instálala en Configuración de Windows → Hora e idioma → Voz → Agregar voces → Español (México), y reinicia Chrome.');
-    });
   }
   if (juegaVista) {
     const vista = crearClienteVista(bus, $('vista'), mapa);
     // Sin cámara se juega igual: el panel del radio acepta el teclado (AGENTS.md §5).
     lsm = conDispositivos ? new LsmEngine({ samples: muestras.samples }) : null;
     sistemas.push(vista, crearPanelRadio(bus, vista.panelRadio, lsm));
+    // En dos PC, Vista también oye el edificio (monstruo, pasos, latidos) por la bocina de su caseta.
+    if (!juegaOido) {
+      const ctx = new AudioContext();
+      void ctx.resume();
+      sistemas.push(crearAudio(bus, mapa, ctx, null, { monitor: true }));
+    }
   }
 
   let fase: Fase = 'inicio';
@@ -139,6 +141,19 @@ async function arrancar(modo: Modo, conDispositivos: boolean): Promise<void> {
     if (e.code !== CONFIG.teclas.general.reiniciar) return;
     e.preventDefault();
     reiniciar();
+  });
+
+  // Recalibrar el micrófono a media partida: el ruido del lugar cambia (sobre todo en el foro).
+  let recalibrando = false;
+  window.addEventListener('keydown', (e) => {
+    if (e.code !== CONFIG.teclas.general.recalibrar || !microfono?.activo || recalibrando) return;
+    e.preventDefault();
+    recalibrando = true;
+    avisar('dispositivos', `Calibrando el ruido del cuarto: ${CONFIG.ruido.segCalibracion} segundos de silencio, por favor.`);
+    void microfono.calibrar().then(() => {
+      recalibrando = false;
+      avisar('dispositivos', '');
+    });
   });
 
   let antes = performance.now();

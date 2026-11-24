@@ -2,19 +2,8 @@
  * Voz del radio (DISENO.md §4.2). MVP: voz sintética con speechSynthesis en español de México.
  * La estática y el filtro de radio los pone el audio de Oído (src/audio), no esta voz.
  *
- * ── Futuro: crearVozGrabada(ctx: AudioContext): VozRadio ──────────────────────────────────────────
- * Misma interfaz VozRadio, sin tocar el resto del código:
- *   1. Precargar con fetch + ctx.decodeAudioData un AudioBuffer por clip grabado por el equipo
- *      (public/radio/avanza.ogg, retrocede.ogg, gira_izquierda.ogg, uno.ogg … cinco.ogg, paso.ogg,
- *      pasos.ogg, pausa corta…), en un Map<string, AudioBuffer>.
- *   2. decir(texto): partir el texto en órdenes por SEPARADOR_ORDENES (src/radio/mensaje.ts) y cada
- *      orden en frases conocidas ("Avanza" + "dos" + "pasos"); mapear cada frase a su clip (lo ideal
- *      es que fichasATexto tenga una gemela que devuelva la lista de claves de clip).
- *   3. Programar los AudioBufferSourceNode uno tras otro con start(t) acumulando duraciones (+ pausa
- *      entre órdenes), todos hacia un GainNode de salida que el audio conecta a su cadena de radio
- *      (mono, filtro de banda, estática).
- *   4. Resolver cuando termine el último (onended) con el mismo tiempo límite de seguridad; callar()
- *      llama stop() a los nodos programados. Si falta un clip, caer a la voz sintética para esa frase.
+ * La voz con clips grabados está en src/radio/vozGrabada.ts (`crearVozGrabada(ctx, respaldo)`), con
+ * la misma interfaz VozRadio; esta voz sintética queda como su respaldo.
  */
 import { CONFIG } from '../config';
 import type { VozRadio } from '../shared/contratos';
@@ -147,28 +136,4 @@ export function crearVozSintetica(): VozRadio {
       for (const r of [...enCurso]) r.terminar();
     },
   };
-}
-
-/**
- * ¿Esta PC tiene alguna voz en el idioma del radio? Sin ella el navegador lee el español con una
- * voz en inglés y no se entiende. Las voces cargan tarde en Chrome: se espera un momento antes de
- * decidir. Resuelve `true` si no hay speechSynthesis (no hay nada que avisar).
- */
-export function hayVozParaElRadio(msEspera = 1500): Promise<boolean> {
-  const synth = typeof window !== 'undefined' && 'speechSynthesis' in window ? window.speechSynthesis : null;
-  if (!synth) return Promise.resolve(true);
-  const hay = (): boolean => elegirVoz(synth.getVoices(), CONFIG.radio.voz.idioma) !== null;
-  if (hay()) return Promise.resolve(true);
-  return new Promise((resolver) => {
-    const fin = (): void => {
-      synth.removeEventListener('voiceschanged', alCambiar);
-      clearTimeout(reloj);
-      resolver(hay());
-    };
-    const alCambiar = (): void => {
-      if (hay()) fin();
-    };
-    const reloj = setTimeout(fin, msEspera);
-    synth.addEventListener('voiceschanged', alCambiar);
-  });
 }

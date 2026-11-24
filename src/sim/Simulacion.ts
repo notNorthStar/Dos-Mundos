@@ -7,6 +7,7 @@ import { CONFIG, type Config } from '../config';
 import type { Bus, EstadoJuego, Fase, Mapa, Mensajes, ObjetoId, TipoMensaje } from '../shared/contratos';
 import { centroDe, cuartoEn, distancia, hayPared, puertasIniciales, type Puertas } from '../shared/mapaUtil';
 import { AJUSTES_SIM, type AjustesSim } from './ajustes';
+import type { Azar } from './azar';
 import { circuloTocaCasilla, objetoAlAlcance, puertaDeCamara, salidaAlAlcance } from './interaccion';
 import { Monstruo } from './monstruo';
 import { MovimientoOido } from './movimiento';
@@ -38,6 +39,8 @@ export class Simulacion {
     private readonly bus: Bus,
     private readonly mapa: Mapa,
     private readonly config: Config = CONFIG,
+    /** Azar del merodeo del monstruo. Las pruebas pasan uno sembrado (`crearAzar`). */
+    private readonly azar: Azar = Math.random,
   ) {
     this.emitir = (tipo, datos) => {
       if (!this.destruida) this.bus.enviar(tipo, datos);
@@ -72,7 +75,7 @@ export class Simulacion {
       oido: {
         pos: { ...this.oido.pos },
         rumbo: this.oido.rumbo,
-        cabeza: 0,
+        cabeza: this.oido.cabeza,
         cuartoId: cuartoEn(this.mapa, this.oido.pos).id,
         corriendo: this.oido.corriendo,
         moviendose: this.oido.moviendose,
@@ -157,22 +160,35 @@ export class Simulacion {
     this.oido.actualizar(dt);
     this.ruido.actualizar(dt);
     // Aunque Oído no haya encontrado el decibelímetro, el ruido cuenta: el monstruo oye igual.
+    // El ruido siempre viene de donde está Oído; el monstruo solo lo usa mientras haya ruido.
     this.monstruo.actualizar(dt, this.ruido.zona, this.oido.pos, this.puertas);
     this.revisarAtrapa();
   }
 
   /**
-   * En CUALQUIER estado (también en patrulla y en escucha), si el monstruo queda a
-   * `distanciaAtrapa` o menos de Oído y no hay pared ni puerta cerrada entre los dos, lo atrapa.
-   * Decisión de diseño: en patrulla también atrapa por contacto. El monstruo no "ve", pero si
-   * tropieza con Oído lo agarra; por eso no basta con callarse: hay que quedarse quieto FUERA
-   * de su ruta, y Vista (que sabe por dónde pasa) tiene que advertirlo o encerrarlo.
+   * Oído está escondido si lleva `segQuietoParaOcultarse` sin dar un paso, girar ni chocar, y el
+   * ruido está en silencio. Mover la cabeza no cuenta como moverse.
+   */
+  private get oidoEscondido(): boolean {
+    return (
+      !this.oido.moviendose &&
+      this.oido.segQuieto >= this.config.monstruo.segQuietoParaOcultarse &&
+      this.ruido.zona === 'silencio'
+    );
+  }
+
+  /**
+   * El monstruo atrapa a Oído si queda a `distanciaAtrapa` o menos y no hay pared ni puerta
+   * cerrada entre los dos. Regla de esconderse (decidida por el equipo): si NO está cazando y
+   * Oído está quieto y en silencio, pasa de largo aunque le camine por encima. Cazando atrapa
+   * por contacto siempre.
    */
   private revisarAtrapa(): void {
     const m = this.monstruo.pos;
     const o = this.oido.pos;
     if (distancia(m, o) > this.config.monstruo.distanciaAtrapa) return;
     if (hayPared(this.mapa, this.puertas, m, o)) return;
+    if (this.monstruo.estado !== 'caza' && this.oidoEscondido) return;
     this.monstruo.atrapar();
     this.cambiarFase('perdieron');
   }
@@ -182,6 +198,7 @@ export class Simulacion {
   /**
    * Prioridad: 1) objeto sin agarrar al alcance; 2) la puerta de salida si está cerca;
    * 3) nada. El contrato dice "al frente", pero solo se exige distancia: Oído juega a ciegas.
+   * Desde el centro de una casilla alcanza lo que haya en ella o en una contigua (no en diagonal).
    */
   private interactuar(): void {
     if (!this.jugando) return;
@@ -254,7 +271,7 @@ export class Simulacion {
   }
 
   private crearMonstruo(): Monstruo {
-    return new Monstruo(this.mapa, this.config.monstruo, this.ajustes, this.emitir);
+    return new Monstruo(this.mapa, this.config.monstruo, this.ajustes, this.emitir, this.azar);
   }
 
   private oir<T extends TipoMensaje>(tipo: T, fn: (datos: Mensajes[T]) => void): void {

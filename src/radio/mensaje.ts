@@ -41,7 +41,8 @@ export const VOCABULARIO: Readonly<Record<Sena, EntradaVocabulario>> = {
   // La U (escaleras) no entra en el MVP (DISENO.md §9): se conserva para la fase 2.
   U: entrada('U', 'Up', 'Arriba', 'Sube', null, false),
   D: entrada('D', 'Down', 'Abajo', 'Agáchate, está en el piso'),
-  S: entrada('S', 'Stop', 'Quieto', 'Quieto. No hagas ruido'),
+  // Con coma, no con punto: el punto seguido de espacio es SEPARADOR_ORDENES y partiría la orden en dos.
+  S: entrada('S', 'Stop', 'Quieto', 'Quieto, no hagas ruido'),
   A: entrada('A', 'Grab', 'Agarra', 'Ahí está, agárralo'),
 };
 
@@ -108,6 +109,28 @@ export function fichasATexto(fichas: readonly Ficha[]): string {
     }
   }
   return ordenes.join(SEPARADOR_ORDENES);
+}
+
+/**
+ * Todas las órdenes sueltas que `fichasATexto` puede producir (sin `SEPARADOR_ORDENES`): cada seña
+ * sola (también la U, por si se habilita), F y B con 1–5 pasos y los números sueltos. Es la lista de
+ * clips que necesita la voz grabada (src/radio/vozGrabada.ts, tools/generar-voces.mjs).
+ */
+export function frasesDelRadio(): string[] {
+  const frases: string[] = [];
+  const agregar = (fichas: Ficha[]) => {
+    const t = fichasATexto(fichas);
+    if (t && !frases.includes(t)) frases.push(t);
+  };
+  const numeros: NumeroPasos[] = [1, 2, 3, 4, 5];
+  for (const sena of SENAS) {
+    agregar([{ tipo: 'sena', sena }]);
+    if (VOCABULARIO[sena].verboConNumero) {
+      for (const valor of numeros) agregar([{ tipo: 'sena', sena }, { tipo: 'numero', valor }]);
+    }
+  }
+  for (const valor of numeros) agregar([{ tipo: 'numero', valor }]);
+  return frases;
 }
 
 /** true si la última ficha es una seña que acepta número (F o B). */

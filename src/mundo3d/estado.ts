@@ -39,6 +39,7 @@ export function copiarEstado(destino: EstadoJuego, origen: EstadoJuego): void {
   destino.oido.pos.x = origen.oido.pos.x;
   destino.oido.pos.z = origen.oido.pos.z;
   destino.oido.rumbo = origen.oido.rumbo;
+  destino.oido.cabeza = origen.oido.cabeza;
   destino.oido.cuartoId = origen.oido.cuartoId;
   destino.oido.corriendo = origen.oido.corriendo;
   destino.oido.moviendose = origen.oido.moviendose;

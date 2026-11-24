@@ -48,7 +48,12 @@ function compresor(ctx: AudioContext, op: { umbralDb: number; rodillaDb: number;
   return c;
 }
 
-export function crearMezcla(ctx: AudioContext): Mezcla {
+export interface OpcionesMezcla {
+  /** PC de Vista: todo sale como por la bocina del monitor de la caseta (ajustes.monitor). */
+  monitor?: boolean;
+}
+
+export function crearMezcla(ctx: AudioContext, opciones: OpcionesMezcla = {}): Mezcla {
   const A = AJUSTES_AUDIO;
   const nodos: AudioNode[] = [];
   const gan = (v: number): GainNode => {
@@ -57,13 +62,41 @@ export function crearMezcla(ctx: AudioContext): Mezcla {
     nodos.push(g);
     return g;
   };
+  const biquad = (tipo: BiquadFilterType, hz: number, q: number, db = 0): BiquadFilterNode => {
+    const f = ctx.createBiquadFilter();
+    f.type = tipo;
+    f.frequency.value = hz;
+    f.Q.value = q;
+    f.gain.value = db;
+    nodos.push(f);
+    return f;
+  };
 
   // Cadena final.
   const maestro = gan(CONFIG.audio.volumenGeneral);
   const comp = compresor(ctx, A.mezcla.compresor);
   const lim = compresor(ctx, A.mezcla.limitador);
   nodos.push(comp, lim);
-  maestro.connect(comp);
+  if (opciones.monitor) {
+    // Bocina de monitor: (mono) → pasa-altas → resonancia de caja → pasa-bajas → algo más bajo.
+    const Mo = A.monitor;
+    const hp = biquad('highpass', Mo.hzBajo, 0.7);
+    if (Mo.mono) {
+      hp.channelCount = 1;
+      hp.channelCountMode = 'explicit';
+      hp.channelInterpretation = 'speakers';
+    }
+    const caja = biquad('peaking', Mo.hzCaja, 1.2, Mo.dbCaja);
+    const lp = biquad('lowpass', Mo.hzAlto, 0.7);
+    const vol = gan(Mo.volumen);
+    maestro.connect(hp);
+    hp.connect(caja);
+    caja.connect(lp);
+    lp.connect(vol);
+    vol.connect(comp);
+  } else {
+    maestro.connect(comp);
+  }
   comp.connect(lim);
   lim.connect(ctx.destination);
 

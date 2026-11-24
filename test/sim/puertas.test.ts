@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { CONFIG } from '../../src/config';
-import { crearPartida } from './ayuda';
+import { azarFijo, crearPartida } from './ayuda';
 
 describe('puertas de Vista', () => {
   it('vista/camara acepta solo las cámaras 1 a 5', () => {
@@ -64,8 +64,9 @@ describe('puertas de Vista', () => {
   });
 
   it('no se puede cerrar con el monstruo cruzando la puerta', () => {
-    const p = crearPartida();
-    // Sale de la guarida: entra a la casilla de la puerta (10,4) entre 0.9 s y 1.8 s.
+    // Azar a la medida: sale enseguida de la guarida hacia el punto (10.5, 2.5) del pasillo.
+    const p = crearPartida({ azar: azarFijo(0.25, 0), monstruo: { segInicioTranquilo: 0 } });
+    // Entra a la casilla de la puerta (10,4) durante su segundo paso.
     p.avanzar(CONFIG.monstruo.segPorPasoPatrulla * 1.6);
     p.puerta(2);
     expect(p.sim.estado.puertas['p-guarida']).toBe(true);

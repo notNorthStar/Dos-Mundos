@@ -5,7 +5,7 @@ import type { EstadoJuego } from '../../src/shared/contratos';
 import { puertasIniciales } from '../../src/shared/mapaUtil';
 import { AJUSTES_SIM } from '../../src/sim/ajustes';
 import { Simulacion } from '../../src/sim/Simulacion';
-import { crearPartida, DT } from './ayuda';
+import { crearPartida, DT, jugarGuionizado } from './ayuda';
 
 describe('sim/estado', () => {
   it('se emite unas 15 veces por segundo y de inmediato al cambiar de fase', () => {
@@ -61,13 +61,14 @@ describe('sim/estado', () => {
   });
 
   it('un cuadro larguísimo equivale a muchos cuadros cortos', () => {
-    const a = crearPartida();
-    const b = crearPartida();
+    const a = crearPartida({ semilla: 4, monstruo: { segInicioTranquilo: 0 } });
+    const b = crearPartida({ semilla: 4, monstruo: { segInicioTranquilo: 0 } });
     a.sim.actualizar(3);
     for (let i = 0; i < 180; i++) b.sim.actualizar(DT);
     expect(a.sim.estado.monstruo.pos.x).toBeCloseTo(b.sim.estado.monstruo.pos.x, 1);
     expect(a.sim.estado.monstruo.pos.z).toBeCloseTo(b.sim.estado.monstruo.pos.z, 1);
     expect(a.de('sim/monstruoPaso')).toEqual(b.de('sim/monstruoPaso'));
+    expect(a.de('sim/monstruoPaso').length).toBeGreaterThan(0);
   });
 });
 
@@ -78,6 +79,7 @@ describe('reinicio', () => {
     p.puerta(3); // cierra la bodega
     p.caminar(1);
     p.girar('der');
+    p.bus.enviar('oido/girarFino', { grados: 25 });
     p.bus.enviar('ruido/microfono', { nivel: 1 });
     p.avanzar(10);
     expect(p.sim.estado.fase).toBe('perdieron');
@@ -90,7 +92,7 @@ describe('reinicio', () => {
     const e = p.sim.estado;
     expect(e.fase).toBe('jugando');
     expect(e.t).toBe(0);
-    expect(e.oido).toEqual({ pos: ALA_ESTE.inicioOido.pos, rumbo: ALA_ESTE.inicioOido.rumbo, cuartoId: 'cuarto1', corriendo: false, moviendose: false });
+    expect(e.oido).toEqual({ pos: ALA_ESTE.inicioOido.pos, rumbo: ALA_ESTE.inicioOido.rumbo, cabeza: 0, cuartoId: 'cuarto1', corriendo: false, moviendose: false });
     expect(e.monstruo.pos).toEqual(ALA_ESTE.inicioMonstruo);
     expect(e.monstruo.estado).toBe('patrulla');
     expect(e.puertas).toEqual(puertasIniciales(ALA_ESTE));
@@ -165,35 +167,43 @@ describe('partida feliz completa', () => {
     expect(p.sim.estado.puertas['p-cuarto1']).toBe(true);
   });
 
-  it('también se gana sin cerrar puertas, esquivando la patrulla en silencio', () => {
+  it('las metas se alcanzan desde centros de casilla: decibelímetro, llave y salida', () => {
     const p = crearPartida();
-    // Espera en su cuarto a que el monstruo recorra el pasillo y se meta de vuelta a la guarida.
-    p.girar('der', 2);
-    let salio = false;
-    for (let i = 0; i < 2000 && p.sim.estado.fase === 'jugando'; i++) {
-      const { oido, monstruo, inventario } = p.sim.estado;
-      if (!salio) {
-        // Sale justo cuando el monstruo deja el pasillo rumbo al sur: cruza a sus espaldas.
-        const vaAlSur = Math.abs(monstruo.rumbo - 180) < 1 && monstruo.pos.z > 3.4;
-        if (vaAlSur && p.sim.estado.t > 5) salio = true;
-        else p.avanzar(0.1);
-        continue;
-      }
-      if (oido.cuartoId !== 'bodega' && oido.cuartoId !== 'vestibulo') {
-        p.caminar(1, 'adelante', false);
-        continue;
-      }
-      if (!inventario.llave) {
-        while (p.sim.estado.oido.pos.x < 17.4) p.caminar(1);
-        p.girar('der');
-        p.caminar(1);
-        p.bus.enviar('oido/interactuar', {});
-        continue;
-      }
-      p.caminar(5);
-      p.bus.enviar('oido/interactuar', {});
+    p.puerta(2);
+    expect(jugarGuionizado(p)).toBe('ganaron');
+    expect(p.de('sim/objeto').map((o) => o.id)).toEqual(['decibelimetro', 'llave']);
+    expect(p.de('sim/nadaQueAgarrar')).toHaveLength(0);
+    expect(p.de('sim/choque')).toHaveLength(0);
+  });
+});
+
+/**
+ * La partida tiene que poder ganarse SIN encerrar al monstruo: un Oído prudente (camina en
+ * silencio y se queda quieto cuando el monstruo anda a 2 casillas o menos) gana siempre, salga
+ * cuando salga y merodee por donde merodee el monstruo.
+ */
+describe('partida ganable con el monstruo suelto', () => {
+  const SEMILLAS = [1, 2, 3, 5, 8, 13, 21, 34, 55, 89, 144, 233];
+
+  it.each(SEMILLAS)('semilla %i: Oído prudente gana saliendo con el monstruo ya merodeando', (semilla) => {
+    for (const espera of [0, 30, 75]) {
+      const p = crearPartida({ semilla });
+      p.avanzar(espera);
+      expect(jugarGuionizado(p)).toBe('ganaron');
+      expect(p.sim.estado.inventario).toEqual({ decibelimetro: true, llave: true });
+      expect(p.sim.estado.ruido.nivel).toBe(0);
+      expect(p.de('sim/puerta').filter((x) => x.portazo)).toHaveLength(0);
     }
-    expect(p.sim.estado.fase).toBe('ganaron');
-    expect(p.sim.estado.ruido.nivel).toBe(0);
+  });
+
+  it('el peligro es real: un Oído que nunca se detiene pierde en buena parte de las partidas', () => {
+    let perdidas = 0;
+    for (let semilla = 1; semilla <= 40; semilla++) {
+      const p = crearPartida({ semilla });
+      p.avanzar(60);
+      if (jugarGuionizado(p, 0) === 'perdieron') perdidas++;
+    }
+    expect(perdidas).toBeGreaterThanOrEqual(8);
+    expect(perdidas).toBeLessThan(40);
   });
 });

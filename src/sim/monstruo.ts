@@ -1,50 +1,83 @@
 /**
- * El monstruo (DISENO.md §5.2): patrulla → escucha → caza → atrapa. Lógica pura.
+ * El monstruo (DISENO.md §5.2). Lógica pura.
  *
- * Se mueve de centro de casilla en centro de casilla siguiendo una ruta BFS que se recalcula en
- * cada casilla, así que nunca atraviesa una puerta cerrada: si le cortan el paso, espera.
- * Decidir si atrapa a Oído es cosa de Simulacion.ts (necesita la posición de los dos).
+ * Por dentro tiene más modos que los cuatro estados del contrato; hacia afuera se anuncian así:
+ *
+ *   modo interno  | estado público | qué hace
+ *   --------------|----------------|-----------------------------------------------------------
+ *   guarida       | patrulla       | al empezar, espera `segInicioTranquilo` en su guarida
+ *   merodeo       | patrulla       | camina a un punto de merodeo elegido al azar
+ *   pausa         | patrulla       | parado un rato (al azar) antes de elegir otro punto
+ *   escucha       | escucha        | oyó ruido en «cuidado»: se detiene y voltea hacia el ruido
+ *   investiga     | escucha        | el ruido en «cuidado» no paró: va a paso lento al último punto
+ *   busca         | escucha        | llegó al punto del ruido y no hay nada: espera `segBusca`
+ *   caza          | caza           | ruido en «peligro»: va rápido al ÚLTIMO PUNTO donde lo oyó
+ *
+ * Nunca sabe dónde está Oído: solo recuerda dónde sonó el último ruido. Se mueve de centro de
+ * casilla en centro de casilla con una ruta BFS que se recalcula en cada casilla, así que nunca
+ * atraviesa una puerta cerrada. Decidir si atrapa a Oído es cosa de Simulacion.ts.
  */
 import type { Config } from '../config';
 import type { Casilla, EstadoMonstruo, Mapa, Punto, ZonaRuido } from '../shared/contratos';
 import { casillaDe, centroDe, cuartoEn, normalizarRumbo, rumboHacia, type Puertas } from '../shared/mapaUtil';
 import type { AjustesSim } from './ajustes';
+import type { Azar } from './azar';
 import { buscarRuta, mismaCasilla } from './rutas';
 import type { Emisor } from './tipos';
 
 /** Rumbo con el que aparece (sur) hasta que da su primer paso. */
 const RUMBO_INICIAL = 180;
 
+export type ModoMonstruo = 'guarida' | 'merodeo' | 'pausa' | 'escucha' | 'investiga' | 'busca' | 'caza';
+
+const PUBLICO: Record<ModoMonstruo, EstadoMonstruo> = {
+  guarida: 'patrulla',
+  merodeo: 'patrulla',
+  pausa: 'patrulla',
+  escucha: 'escucha',
+  investiga: 'escucha',
+  busca: 'escucha',
+  caza: 'caza',
+};
+
 interface PasoMonstruo {
   desde: Punto;
   hacia: Punto;
-  /** 0 a 1. La duración depende del estado en cada momento (caza = rápido). */
+  /** 0 a 1. La duración depende del modo en cada momento (caza = rápido). */
   progreso: number;
 }
 
 export class Monstruo {
   pos: Punto;
   rumbo = normalizarRumbo(RUMBO_INICIAL);
+  /** Estado público (el del contrato): es el que oyen el audio y las cámaras de Vista. */
   estado: EstadoMonstruo = 'patrulla';
+  /** Modo interno (solo para la simulación y las pruebas). */
+  modo: ModoMonstruo = 'guarida';
 
   private paso: PasoMonstruo | null = null;
-  /** Punto de `rutaPatrulla` al que se dirige. */
-  private indiceRuta = 0;
+  /** Punto de merodeo al que va (null = todavía no elige). */
+  private destino: Casilla | null = null;
+  /** Cuenta atrás de guarida, pausa y busca. */
+  private segEspera: number;
   /** Segundos seguidos sin ruido en cuidado ni en peligro. */
   private segSinRuido = 0;
-  /** Segundos seguidos con la ruta de patrulla cortada. */
-  private segBloqueado = 0;
-  /** Último punto de ruido en zona de peligro. */
-  private objetivoCaza: Punto;
+  /** Segundos de ruido en «cuidado» acumulados desde que se puso a escuchar. */
+  private segCuidado = 0;
+  /** Último punto donde oyó ruido (lo que investiga o caza). */
+  private objetivo: Punto;
+  private zona: ZonaRuido = 'silencio';
 
   constructor(
     private readonly mapa: Mapa,
     private readonly config: Config['monstruo'],
     private readonly ajustes: AjustesSim,
     private readonly emitir: Emisor,
+    private readonly azar: Azar,
   ) {
     this.pos = { ...mapa.inicioMonstruo };
-    this.objetivoCaza = { ...this.pos };
+    this.objetivo = { ...this.pos };
+    this.segEspera = config.segInicioTranquilo;
   }
 
   /** true si el monstruo está en esa casilla o entrando a ella (para no cerrarle la puerta encima). */
@@ -55,46 +88,95 @@ export class Monstruo {
 
   /** Lo llama la simulación cuando alcanza a Oído. */
   atrapar(): void {
-    this.cambiarEstado('atrapa');
+    this.publicar('atrapa');
   }
 
-  actualizar(dtSeg: number, zona: ZonaRuido, posOido: Punto, puertas: Puertas): void {
+  /**
+   * `origenRuido` es de dónde viene el ruido que se oye ahora (la posición de Oído); solo se usa
+   * mientras la zona NO es silencio. En silencio el monstruo no recibe ninguna pista.
+   */
+  actualizar(dtSeg: number, zona: ZonaRuido, origenRuido: Punto, puertas: Puertas): void {
     if (this.estado === 'atrapa') return;
-    this.reaccionarAlRuido(dtSeg, zona, posOido);
-    // En escucha se queda quieto donde esté; el paso a medias se reanuda al salir de escucha.
-    if (this.estado !== 'escucha') this.avanzar(dtSeg, puertas);
+    this.zona = zona;
+    this.reaccionarAlRuido(dtSeg, zona, origenRuido);
+
+    switch (this.modo) {
+      case 'guarida':
+      case 'pausa':
+      case 'busca':
+        this.segEspera -= dtSeg;
+        if (this.segEspera <= 0) {
+          // Lo que sobró del cuadro ya se camina: así el resultado no depende del tamaño del cuadro.
+          const sobra = -this.segEspera;
+          this.cambiarModo('merodeo');
+          this.avanzar(sobra, puertas);
+        }
+        break;
+      case 'escucha':
+        // Quieto donde esté; el paso a medias se reanuda al salir de escucha.
+        break;
+      default:
+        this.avanzar(dtSeg, puertas);
+    }
   }
 
-  // ───────────────────────── Estados ─────────────────────────
+  // ───────────────────────── Ruido ─────────────────────────
 
-  private reaccionarAlRuido(dtSeg: number, zona: ZonaRuido, posOido: Punto): void {
+  private reaccionarAlRuido(dtSeg: number, zona: ZonaRuido, origen: Punto): void {
     if (zona === 'peligro') {
-      // El origen del ruido es siempre la posición de Oído; se actualiza mientras siga en peligro.
+      // Mientras el ruido siga en peligro, el objetivo se actualiza; al callarse, se queda fijo.
       this.segSinRuido = 0;
-      this.objetivoCaza = { ...posOido };
-      if (this.estado !== 'caza') this.cambiarEstado('caza');
+      this.objetivo = { ...origen };
+      this.cambiarModo('caza');
       return;
     }
 
     if (zona === 'cuidado') {
       this.segSinRuido = 0;
-      if (this.estado === 'patrulla') this.cambiarEstado('escucha');
-      // En caza, el ruido en cuidado no cambia el objetivo: solo evita que se le olvide.
-      if (this.estado === 'escucha') this.mirarHacia(posOido);
+      switch (this.modo) {
+        case 'caza':
+          // El ruido en cuidado no cambia el objetivo de la caza: solo evita que se le olvide.
+          break;
+        case 'investiga':
+          this.objetivo = { ...origen };
+          break;
+        case 'escucha':
+          this.objetivo = { ...origen };
+          this.segCuidado += dtSeg;
+          if (this.segCuidado > this.config.segEscucha) this.cambiarModo('investiga');
+          else this.mirarHacia(origen);
+          break;
+        default:
+          this.objetivo = { ...origen };
+          this.segCuidado = 0;
+          this.cambiarModo('escucha');
+          this.mirarHacia(origen);
+      }
       return;
     }
 
     this.segSinRuido += dtSeg;
-    if (this.estado === 'escucha' && this.segSinRuido >= this.config.segEscucha) this.cambiarEstado('patrulla');
-    else if (this.estado === 'caza' && this.segSinRuido >= this.config.segOlvido) this.cambiarEstado('patrulla');
+    if (this.modo === 'escucha' && this.segSinRuido >= this.config.segEscucha) this.cambiarModo('merodeo');
+    else if (this.modo === 'caza' && this.segSinRuido >= this.config.segOlvido) this.cambiarModo('merodeo');
   }
 
-  private cambiarEstado(nuevo: EstadoMonstruo): void {
+  private cambiarModo(nuevo: ModoMonstruo): void {
+    if (nuevo === this.modo) return;
+    this.modo = nuevo;
+    if (nuevo === 'busca') this.segEspera = this.config.segBusca;
+    this.publicar(PUBLICO[nuevo]);
+  }
+
+  private publicar(nuevo: EstadoMonstruo): void {
     if (nuevo === this.estado) return;
     const anterior = this.estado;
     this.estado = nuevo;
-    this.segBloqueado = 0;
     this.emitir('sim/monstruoEstado', { estado: nuevo, anterior, pos: { ...this.pos } });
+  }
+
+  private pausar(seg: number): void {
+    this.segEspera = seg;
+    this.cambiarModo('pausa');
   }
 
   private mirarHacia(p: Punto): void {
@@ -105,19 +187,19 @@ export class Monstruo {
   // ───────────────────────── Movimiento ─────────────────────────
 
   private avanzar(dtSeg: number, puertas: Puertas): void {
-    const rapido = this.estado === 'caza';
-    const segPorPaso = rapido ? this.config.segPorPasoCaza : this.config.segPorPasoPatrulla;
     let resto = dtSeg;
 
     while (resto > 0) {
+      const rapido = this.modo === 'caza';
+      const segPorPaso = rapido ? this.config.segPorPasoCaza : this.config.segPorPasoPatrulla;
+
       if (!this.paso) {
         const siguiente = this.siguienteCasilla(puertas);
         if (!siguiente) {
-          // Sin a dónde ir (ruta cortada o ya llegó): espera y vuelve a calcular en el próximo cuadro.
-          this.esperar(resto);
+          // Si solo le faltaba elegir a dónde ir, sigue caminando en este mismo cuadro.
+          if (this.sinCamino(puertas)) continue;
           return;
         }
-        this.segBloqueado = 0;
         const hacia = centroDe(siguiente);
         this.mirarHacia(hacia);
         this.paso = { desde: { ...this.pos }, hacia, progreso: 0 };
@@ -146,45 +228,59 @@ export class Monstruo {
     }
   }
 
-  /** Casilla contigua a la que debe ir ahora, o null si no hay camino o ya está en su destino. */
+  /** Casilla contigua a la que debe ir ahora, o null si ya llegó o no hay camino. */
   private siguienteCasilla(puertas: Puertas): Casilla | null {
     const aqui = casillaDe(this.pos);
 
-    if (this.estado === 'caza') {
+    if (this.modo === 'caza' || this.modo === 'investiga') {
       // Si el ruido quedó detrás de una puerta cerrada, se acerca todo lo que puede.
-      const ruta = buscarRuta(this.mapa, puertas, aqui, casillaDe(this.objetivoCaza), true);
+      const ruta = buscarRuta(this.mapa, puertas, aqui, casillaDe(this.objetivo), true);
       return ruta?.[0] ?? null;
     }
 
-    const puntos = this.mapa.rutaPatrulla;
-    // Salta los puntos de la ruta en los que ya está (como mucho, una vuelta completa).
-    for (let i = 0; i < puntos.length; i++) {
-      const meta = puntos[this.indiceRuta % puntos.length];
-      if (!meta || !mismaCasilla(aqui, casillaDe(meta))) break;
-      this.pasarAlSiguientePunto();
-    }
-    const meta = puntos[this.indiceRuta % Math.max(1, puntos.length)];
-    if (!meta) return null;
-    const ruta = buscarRuta(this.mapa, puertas, aqui, casillaDe(meta));
+    if (!this.destino || mismaCasilla(aqui, this.destino)) return null;
+    const ruta = buscarRuta(this.mapa, puertas, aqui, this.destino);
+    if (!ruta) this.destino = null; // le cerraron el paso: elegirá otro punto
     return ruta?.[0] ?? null;
   }
 
   /**
-   * Ruta cortada. En patrulla, tras `segEsperaBloqueo` prueba con el siguiente punto de la ruta:
-   * encerrado en su guarida se queda ahí dando vueltas, y si lo dejan fuera sigue por el pasillo
-   * en vez de quedarse clavado para siempre frente a la puerta.
+   * No hay siguiente casilla: llegó a donde iba, o le cortaron el camino.
+   * Devuelve true si acaba de elegir un punto de merodeo nuevo (y puede seguir caminando ya).
    */
-  private esperar(dtSeg: number): void {
-    if (this.estado !== 'patrulla') return;
-    this.segBloqueado += dtSeg;
-    if (this.segBloqueado >= this.ajustes.segEsperaBloqueo) {
-      this.segBloqueado = 0;
-      this.pasarAlSiguientePunto();
+  private sinCamino(puertas: Puertas): boolean {
+    if (this.modo === 'caza') {
+      // Si el ruido sigue en peligro se queda al acecho (el objetivo se sigue actualizando).
+      if (this.zona !== 'peligro') this.cambiarModo('busca');
+      return false;
     }
+    if (this.modo === 'investiga') {
+      this.cambiarModo('busca');
+      return false;
+    }
+
+    // Merodeo.
+    if (this.destino) {
+      // Llegó al punto: se queda un rato y después elige otro.
+      this.destino = null;
+      const { segPausaMin, segPausaMax } = this.config;
+      this.pausar(segPausaMin + this.azar() * (segPausaMax - segPausaMin));
+      return false;
+    }
+    this.destino = this.elegirDestino(puertas);
+    // Encerrado sin ningún punto alcanzable: espera y vuelve a probar.
+    if (!this.destino) this.pausar(this.ajustes.segEsperaBloqueo);
+    return this.destino !== null;
   }
 
-  private pasarAlSiguientePunto(): void {
-    const n = this.mapa.rutaPatrulla.length;
-    this.indiceRuta = n > 0 ? (this.indiceRuta + 1) % n : 0;
+  /** Un punto de merodeo al azar entre los alcanzables ahora mismo (distinto de donde está). */
+  private elegirDestino(puertas: Puertas): Casilla | null {
+    const aqui = casillaDe(this.pos);
+    const candidatos = this.mapa.rutaPatrulla
+      .map(casillaDe)
+      .filter((c) => !mismaCasilla(c, aqui) && buscarRuta(this.mapa, puertas, aqui, c) !== null);
+    if (candidatos.length === 0) return null;
+    const i = Math.min(candidatos.length - 1, Math.floor(this.azar() * candidatos.length));
+    return candidatos[i] ?? null;
   }
 }

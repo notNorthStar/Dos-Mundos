@@ -1,7 +1,10 @@
 /**
  * Cliente de Oído (docs/CONTRATOS.md §4): pantalla en primera persona en tinieblas y controles
- * (flechas, Shift derecho y mouse). Solo manda órdenes `oido/*` y dibuja lo que anuncia la
+ * (flechas o WASD, Shift y mouse). Solo manda órdenes `oido/*` y dibuja lo que anuncia la
  * simulación. Oído juega con los ojos vendados: esta mitad es para el público.
+ *
+ * Movimiento de tablero: cada pulsación es un paso de una casilla o un giro de 90° del cuerpo.
+ * El mouse solo gira la cabeza (`estado.oido.cabeza`); la cámara mira a `rumbo + cabeza`.
  *
  * El monstruo NO se dibuja (en una sola PC, Vista ve esta mitad y se rompería el juego).
  */
@@ -23,6 +26,10 @@ export function crearClienteOido(bus: Bus, contenedor: HTMLElement, mapa: Mapa):
   /** true si llegó un sim/estado después de la última orden de mover. */
   let estadoDesdeOrden = true;
   let segDesdeOrden = 1;
+  /** Giro de la cabeza del último sim/estado (se guarda aparte: `copiarEstado` no lo copia). */
+  let cabeza = 0;
+  /** true tras un `sim/choque`: la tecla sostenida deja de insistir contra la pared. */
+  let topado = false;
 
   // ───────────────────────── Escena ─────────────────────────
   const mundo = construirMundo(mapa, { mostrarOido: false });
@@ -87,6 +94,8 @@ export function crearClienteOido(bus: Bus, contenedor: HTMLElement, mapa: Mapa):
   const bajas: Array<() => void> = [
     bus.escuchar('sim/estado', (e) => {
       copiarEstado(estado, e);
+      cabeza = Number.isFinite(e.oido.cabeza) ? e.oido.cabeza : 0;
+      estado.oido.cabeza = cabeza;
       estadoDesdeOrden = true;
       avisoSegunFase();
     }),
@@ -97,6 +106,9 @@ export function crearClienteOido(bus: Bus, contenedor: HTMLElement, mapa: Mapa):
     bus.escuchar('sim/objeto', (o) => {
       estado.inventario[o.id] = true;
     }),
+    bus.escuchar('sim/choque', () => {
+      topado = true;
+    }),
     bus.escuchar('sim/fin', (f) => {
       estado.fase = f.resultado;
       avisoSegunFase();
@@ -104,19 +116,30 @@ export function crearClienteOido(bus: Bus, contenedor: HTMLElement, mapa: Mapa):
   ];
 
   // ───────────────────────── Teclado ─────────────────────────
-  let adelante = false;
-  let atras = false;
+  /** Teclas apretadas ahora mismo (valores de KeyboardEvent.code). */
+  const pulsadas = new Set<string>();
   let ultima: Direccion = 'adelante';
-  let corriendo = false;
+
+  const esLetra = (code: string): boolean => code.startsWith('Key');
+  /**
+   * En una sola PC, con el radio de Vista abierto las letras (F B L R S D A…) son señas: el
+   * cliente de Oído ignora W A S D y sigue aceptando las flechas y Shift.
+   */
+  const radioAbierto = (): boolean => document.body.dataset.radioAbierto === '1';
+  const ignorada = (code: string): boolean => esLetra(code) && radioAbierto();
+  const es = (teclas: readonly string[], code: string): boolean => teclas.includes(code);
+  const sostenida = (teclas: readonly string[]): boolean => teclas.some((c) => pulsadas.has(c) && !ignorada(c));
 
   const ordenarMover = (dir: Direccion): void => {
     // Se marca ANTES de enviar: con el bus local la simulación puede contestar en la misma llamada.
     estadoDesdeOrden = false;
     segDesdeOrden = 0;
-    bus.enviar('oido/mover', { dir, corriendo });
+    bus.enviar('oido/mover', { dir, corriendo: sostenida(T.correr) });
   };
 
   const direccionSostenida = (): Direccion | null => {
+    const adelante = sostenida(T.avanzar);
+    const atras = sostenida(T.retroceder);
     if (adelante && atras) return ultima;
     if (adelante) return 'adelante';
     if (atras) return 'atras';
@@ -126,59 +149,33 @@ export function crearClienteOido(bus: Bus, contenedor: HTMLElement, mapa: Mapa):
   const alBajarTecla = (e: KeyboardEvent): void => {
     // Nunca Ctrl (AGENTS.md §2.1); tampoco atajos con Alt o la tecla del sistema.
     if (e.ctrlKey || e.altKey || e.metaKey) return;
-    switch (e.code) {
-      case T.avanzar:
-        e.preventDefault();
-        if (!e.repeat) {
-          adelante = true;
-          ultima = 'adelante';
-          ordenarMover('adelante');
-        }
-        break;
-      case T.retroceder:
-        e.preventDefault();
-        if (!e.repeat) {
-          atras = true;
-          ultima = 'atras';
-          ordenarMover('atras');
-        }
-        break;
-      case T.girarIzq:
-        e.preventDefault();
-        if (!e.repeat) bus.enviar('oido/girar', { sentido: 'izq' });
-        break;
-      case T.girarDer:
-        e.preventDefault();
-        if (!e.repeat) bus.enviar('oido/girar', { sentido: 'der' });
-        break;
-      case T.correr:
-        corriendo = true;
-        break;
-      default:
-        break;
+    const code = e.code;
+    if (ignorada(code)) return;
+
+    if (es(T.avanzar, code) || es(T.retroceder, code)) {
+      e.preventDefault();
+      if (e.repeat) return;
+      pulsadas.add(code);
+      ultima = es(T.avanzar, code) ? 'adelante' : 'atras';
+      topado = false;
+      ordenarMover(ultima);
+    } else if (es(T.girarIzq, code) || es(T.girarDer, code)) {
+      e.preventDefault();
+      if (e.repeat) return;
+      topado = false;
+      bus.enviar('oido/girar', { sentido: es(T.girarIzq, code) ? 'izq' : 'der' });
+    } else if (es(T.correr, code)) {
+      pulsadas.add(code);
     }
   };
 
+  // Soltar se atiende siempre (también con el radio abierto), para no dejar teclas «pegadas».
   const alSoltarTecla = (e: KeyboardEvent): void => {
-    switch (e.code) {
-      case T.avanzar:
-        adelante = false;
-        break;
-      case T.retroceder:
-        atras = false;
-        break;
-      case T.correr:
-        corriendo = false;
-        break;
-      default:
-        break;
-    }
+    pulsadas.delete(e.code);
   };
 
   const soltarTodo = (): void => {
-    adelante = false;
-    atras = false;
-    corriendo = false;
+    pulsadas.clear();
   };
 
   window.addEventListener('keydown', alBajarTecla);
@@ -220,13 +217,15 @@ export function crearClienteOido(bus: Bus, contenedor: HTMLElement, mapa: Mapa):
     const dt = Math.min(Math.max(dtSeg, 0), 0.1);
     segDesdeOrden += dt;
 
-    // Tecla sostenida: se reenvía cuando la simulación avisa que Oído ya no se mueve.
+    // Tecla sostenida = pasos seguidos: se reenvía cuando la simulación avisa que Oído ya no se
+    // mueve. Si topó con una pared deja de insistir hasta que suelte la tecla o gire.
     const dir = direccionSostenida();
-    if (dir && estadoDesdeOrden && !estado.oido.moviendose && segDesdeOrden >= A.segMinEntreOrdenes) {
+    if (!dir) topado = false;
+    else if (!topado && estadoDesdeOrden && !estado.oido.moviendose && segDesdeOrden >= A.segMinEntreOrdenes) {
       ordenarMover(dir);
     }
 
-    // Giro fino: un solo mensaje por cuadro con lo acumulado.
+    // Mouse horizontal → cabeza: un solo mensaje por cuadro con lo acumulado.
     if (pixelesX !== 0) {
       const px = Math.max(-A.maxPixelesPorCuadro, Math.min(A.maxPixelesPorCuadro, pixelesX));
       bus.enviar('oido/girarFino', { grados: px * CONFIG.movimiento.gradosPorPixelMouse });
@@ -245,13 +244,15 @@ export function crearClienteOido(bus: Bus, contenedor: HTMLElement, mapa: Mapa):
     if (primera || Math.hypot(dx, dz) > A.saltoMaximo) {
       camara.position.x = estado.oido.pos.x;
       camara.position.z = estado.oido.pos.z;
-      rumboVista = estado.oido.rumbo;
+      rumboVista = estado.oido.rumbo + cabeza;
       primera = false;
     } else {
       const k = 1 - Math.exp(-A.seguimientoPos * dt);
       camara.position.x += dx * k;
       camara.position.z += dz * k;
-      rumboVista += diferenciaRumbo(rumboVista, estado.oido.rumbo) * (1 - Math.exp(-A.seguimientoRumbo * dt));
+      // La mirada apunta a rumbo + cabeza (el cuerpo solo cambia de 90° en 90°).
+      const mirada = estado.oido.rumbo + cabeza;
+      rumboVista += diferenciaRumbo(rumboVista, mirada) * (1 - Math.exp(-A.seguimientoRumbo * dt));
     }
     camara.rotation.y = -rumboVista * GRADOS;
     camara.rotation.x = inclinacion * GRADOS;

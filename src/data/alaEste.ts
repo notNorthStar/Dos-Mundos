@@ -62,11 +62,24 @@ export const ALA_ESTE: Mapa = {
   // Despierta mirando al oeste; la puerta queda 2 m detrás (DISENO.md §10, paso 3).
   inicioOido: { pos: { x: 3.5, z: 2.5 }, rumbo: 270 },
   inicioMonstruo: { x: 10.5, z: 6.5 },
+  // Puntos de merodeo: el monstruo elige uno al azar, camina hasta ahí, hace una pausa y elige
+  // otro. Repartidos por todos los cuartos para que no viva en el pasillo que hay que cruzar.
   rutaPatrulla: [
+    // Guarida
     { x: 10.5, z: 6.5 },
+    { x: 9.5, z: 7.5 },
+    // Pasillo
+    { x: 7.5, z: 1.5 },
     { x: 10.5, z: 2.5 },
-    { x: 6.5, z: 2.5 },
-    { x: 14.5, z: 2.5 },
-    { x: 10.5, z: 2.5 },
+    { x: 13.5, z: 3.5 },
+    // Cuarto
+    { x: 1.5, z: 1.5 },
+    { x: 2.5, z: 4.5 },
+    // Bodega
+    { x: 19.5, z: 1.5 },
+    { x: 16.5, z: 4.5 },
+    // Vestíbulo de salida
+    { x: 14.5, z: 7.5 },
+    { x: 19.5, z: 6.5 },
   ],
 };

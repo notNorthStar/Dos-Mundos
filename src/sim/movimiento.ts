@@ -1,10 +1,11 @@
 /**
- * Movimiento de Oído: pasos de 1 m con colisión, giros de 90° animados y giro fino.
+ * Movimiento de Oído, de tablero: vive en centros de casilla, un paso = exactamente una casilla
+ * (hacia el rumbo o en reversa) y el cuerpo gira de 90° en 90°. El mouse solo gira la cabeza.
  * Lógica pura (docs/CONTRATOS.md §2 y §5).
  */
 import type { Config } from '../config';
-import type { Mapa, Punto } from '../shared/contratos';
-import { chocaCirculo, cuartoEn, normalizarRumbo, vectorDeRumbo, type Puertas } from '../shared/mapaUtil';
+import type { Casilla, Mapa, Punto } from '../shared/contratos';
+import { casillaDe, centroDe, cuartoEn, esPared, normalizarRumbo, vectorDeRumbo, type Puertas } from '../shared/mapaUtil';
 import type { AjustesSim } from './ajustes';
 import type { MedidorRuido } from './ruido';
 import type { Emisor } from './tipos';
@@ -22,7 +23,7 @@ interface PasoEnCurso {
 }
 
 interface GiroEnCurso {
-  /** Rumbo al empezar (sin normalizar: el giro fino lo desplaza durante la animación). */
+  /** Rumbo al empezar (siempre múltiplo de 90). */
   desde: number;
   /** Grados con signo que hay que girar. */
   delta: number;
@@ -31,9 +32,22 @@ interface GiroEnCurso {
 
 export class MovimientoOido {
   pos: Punto;
+  /** Rumbo del cuerpo: en reposo siempre 0, 90, 180 o 270. */
   rumbo: number;
+  /** Giro de la cabeza respecto al cuerpo (+ = derecha), acotado por `gradosCabezaMax`. */
+  cabeza = 0;
+  /**
+   * Segundos desde que terminó el último paso o giro (o desde el último choque). Mientras se
+   * mueve vale 0. La simulación lo usa para saber si Oído está escondido (quieto).
+   */
+  segQuieto = Number.POSITIVE_INFINITY;
+
   private paso: PasoEnCurso | null = null;
   private giro: GiroEnCurso | null = null;
+  /** true mientras la cabeza vuelve sola al frente. */
+  private recentrando = false;
+  /** Segundos desde el último `sim/choque` (para no repetirlo con la tecla sostenida). */
+  private segDesdeChoque = Number.POSITIVE_INFINITY;
 
   constructor(
     private readonly mapa: Mapa,
@@ -42,8 +56,10 @@ export class MovimientoOido {
     private readonly ruido: MedidorRuido,
     private readonly emitir: Emisor,
   ) {
-    this.pos = { ...mapa.inicioOido.pos };
-    this.rumbo = normalizarRumbo(mapa.inicioOido.rumbo);
+    // Por si el mapa no lo trae exacto: siempre al centro de la casilla y a un rumbo de tablero.
+    this.pos = centroDe(casillaDe(mapa.inicioOido.pos));
+    const giro = config.movimiento.gradosPorGiro;
+    this.rumbo = normalizarRumbo(Math.round(mapa.inicioOido.rumbo / giro) * giro);
   }
 
   /** true mientras dura la animación de un paso o de un giro de 90°. */
@@ -62,31 +78,36 @@ export class MovimientoOido {
   }
 
   /**
-   * Un paso de `metrosPorPaso` hacia el rumbo (o en reversa). Se ignora si hay un paso o un giro
-   * en curso. Si el paso completo no cabe, avanza hasta donde quepa; si no cabe casi nada
-   * (menos de `avanceMinimo`), no se mueve y anuncia `sim/choque`.
+   * Un paso de exactamente una casilla hacia el rumbo del cuerpo (o en reversa, sin girar); nunca
+   * hacia donde mira la cabeza. Se ignora si hay un paso o un giro en curso. Si la casilla de
+   * destino es pared o puerta cerrada, no se mueve y anuncia `sim/choque` (con su ruido); los
+   * choques repetidos muy seguidos (tecla sostenida) se callan.
    */
   mover(dir: 'adelante' | 'atras', corriendo: boolean, puertas: Puertas): void {
     if (this.moviendose) return;
     const cfg = this.config.movimiento;
     const rumboAvance = dir === 'adelante' ? this.rumbo : normalizarRumbo(this.rumbo + MEDIA_VUELTA);
     const v = vectorDeRumbo(rumboAvance);
-    const libre = this.metrosLibres(v, puertas);
+    const aqui = casillaDe(this.pos);
+    const destino: Casilla = { cx: aqui.cx + Math.round(v.x), cz: aqui.cz + Math.round(v.z) };
 
-    if (libre < this.ajustes.avanceMinimo) {
+    if (esPared(this.mapa, puertas, destino.cx, destino.cz)) {
+      if (this.segDesdeChoque < this.ajustes.segMinEntreChoques) return;
+      this.segDesdeChoque = 0;
+      this.segQuieto = 0;
       this.ruido.sumar(this.config.ruido.porChoque);
       // El rumbo del choque es hacia donde está el obstáculo (detrás, si iba en reversa).
       this.emitir('sim/choque', { pos: { ...this.pos }, rumbo: rumboAvance });
       return;
     }
 
-    const segPaso = corriendo ? cfg.segPorPasoCorriendo : cfg.segPorPaso;
+    this.recentrando = true;
+    this.segQuieto = 0;
     this.paso = {
       desde: { ...this.pos },
-      hacia: { x: this.pos.x + v.x * libre, z: this.pos.z + v.z * libre },
+      hacia: centroDe(destino),
       progreso: 0,
-      // Un paso recortado dura en proporción a lo que avanza.
-      seg: segPaso * (libre / cfg.metrosPorPaso),
+      seg: corriendo ? cfg.segPorPasoCorriendo : cfg.segPorPaso,
       corriendo,
     };
   }
@@ -95,17 +116,37 @@ export class MovimientoOido {
   girar(sentido: 'izq' | 'der'): void {
     if (this.moviendose) return;
     const grados = this.config.movimiento.gradosPorGiro;
+    this.recentrando = true;
+    this.segQuieto = 0;
     this.giro = { desde: this.rumbo, delta: sentido === 'der' ? grados : -grados, progreso: 0 };
   }
 
-  /** Giro fino (mouse): se aplica al instante, también en medio de un paso o de un giro. */
+  /**
+   * Mouse: gira solo la cabeza, nunca el cuerpo, acotada a ±`gradosCabezaMax`. Durante un paso o
+   * un giro se ignora: la cabeza va al frente, para que un jugador vendado no camine con la
+   * cabeza chueca sin saberlo.
+   */
   girarFino(grados: number): void {
-    if (!Number.isFinite(grados)) return;
-    if (this.giro) this.giro.desde += grados;
-    this.rumbo = normalizarRumbo(this.rumbo + grados);
+    if (!Number.isFinite(grados) || this.moviendose) return;
+    const max = this.config.movimiento.gradosCabezaMax;
+    this.recentrando = false;
+    this.cabeza = Math.max(-max, Math.min(max, this.cabeza + grados));
   }
 
   actualizar(dtSeg: number): void {
+    this.segDesdeChoque += dtSeg;
+    if (!this.moviendose) this.segQuieto += dtSeg;
+
+    if (this.recentrando) {
+      const avance = this.config.movimiento.gradosPorSegRecentrarCabeza * dtSeg;
+      if (Math.abs(this.cabeza) <= avance) {
+        this.cabeza = 0;
+        this.recentrando = false;
+      } else {
+        this.cabeza -= Math.sign(this.cabeza) * avance;
+      }
+    }
+
     if (this.giro) {
       const g = this.giro;
       g.progreso += dtSeg / this.config.movimiento.segPorGiro;
@@ -136,19 +177,5 @@ export class MovimientoOido {
         };
       }
     }
-  }
-
-  /** Metros que Oído puede avanzar en la dirección `v` sin tocar pared (de 0 a `metrosPorPaso`). */
-  private metrosLibres(v: Punto, puertas: Puertas): number {
-    const metros = this.config.movimiento.metrosPorPaso;
-    const n = Math.max(1, Math.round(metros / this.ajustes.precisionBarrido));
-    let libre = 0;
-    for (let i = 1; i <= n; i++) {
-      const d = (metros * i) / n;
-      const p = { x: this.pos.x + v.x * d, z: this.pos.z + v.z * d };
-      if (chocaCirculo(this.mapa, puertas, p, this.ajustes.radioOido)) break;
-      libre = d;
-    }
-    return libre;
   }
 }

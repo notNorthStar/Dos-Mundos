@@ -4,9 +4,11 @@ import type { Ficha, Sena } from '../../src/shared/contratos';
 import {
   Compositor,
   SENAS_HABILITADAS,
+  SEPARADOR_ORDENES,
   VOCABULARIO,
   etiquetaFicha,
   fichasATexto,
+  frasesDelRadio,
   puedeAgregar,
 } from '../../src/radio/mensaje';
 import { Sostenedor } from '../../src/radio/sostener';
@@ -38,7 +40,7 @@ describe('fichasATexto', () => {
     [[s('L')], 'Gira a la izquierda'],
     [[s('R')], 'Gira a la derecha'],
     [[s('D')], 'Agáchate, está en el piso'],
-    [[s('S')], 'Quieto. No hagas ruido'],
+    [[s('S')], 'Quieto, no hagas ruido'],
     [[s('A')], 'Ahí está, agárralo'],
     [[s('F'), n(5)], 'Avanza cinco pasos'],
     [[s('F'), n(4)], 'Avanza cuatro pasos'],
@@ -59,6 +61,40 @@ describe('fichasATexto', () => {
   it('un número suelto (no debería llegar) se dice solo', () => {
     expect(fichasATexto([s('L'), n(2)])).toBe('Gira a la izquierda. Dos pasos');
     expect(fichasATexto([n(1)])).toBe('Un paso');
+  });
+
+  it('ninguna orden suelta contiene el separador', () => {
+    for (const f of frasesDelRadio()) expect(f.includes(SEPARADOR_ORDENES)).toBe(false);
+  });
+});
+
+describe('frasesDelRadio', () => {
+  const frases = frasesDelRadio();
+
+  it('tiene cada seña sola, F y B con 1–5 pasos y los números sueltos (23 frases, sin repetir)', () => {
+    expect(frases).toHaveLength(8 + 2 * 5 + 5);
+    expect(new Set(frases).size).toBe(frases.length);
+    for (const sena of Object.keys(VOCABULARIO) as Sena[]) expect(frases).toContain(fichasATexto([s(sena)]));
+    for (const v of [1, 2, 3, 4, 5] as const) {
+      expect(frases).toContain(fichasATexto([s('F'), n(v)]));
+      expect(frases).toContain(fichasATexto([s('B'), n(v)]));
+      expect(frases).toContain(fichasATexto([n(v)]));
+    }
+    expect(frases).toContain('Quieto, no hagas ruido');
+    expect(frases).toContain('Retrocede un paso');
+    expect(frases).toContain('Cinco pasos');
+  });
+
+  it('cualquier mensaje se parte en órdenes que están en la lista', () => {
+    const mensajes: Ficha[][] = [
+      [s('L'), s('L'), s('F'), n(2)],
+      [s('R'), s('F'), s('D'), s('A')],
+      [s('S')],
+      [s('B'), n(5), s('B'), s('L'), n(3)],
+    ];
+    for (const m of mensajes) {
+      for (const orden of fichasATexto(m).split(SEPARADOR_ORDENES)) expect(frases).toContain(orden);
+    }
   });
 });
 

@@ -32,7 +32,8 @@
 | Ejes | `+x` = este, `+z` = sur, `+y` = arriba (los de Three.js vistos desde arriba con el norte hacia `−z`) |
 | Casillas | La casilla `(cx, cz)` va de `(cx, cz)` a `(cx+1, cz+1)`; su centro es `(cx+0.5, cz+0.5)` |
 | Rumbo | Grados en `[0, 360)`: 0 = norte (`−z`), 90 = este, 180 = sur, 270 = oeste. Girar a la derecha suma |
-| Posición de Oído | Continua (por el giro fino con el mouse). Un paso avanza 1 m hacia el rumbo; si hay pared se detiene antes y la simulación emite `sim/choque` |
+| Posición de Oído | Siempre en centros de casilla cuando está quieto. Un paso avanza exactamente una casilla hacia el rumbo (o en contra, al retroceder); si hay pared o puerta cerrada no se mueve y la simulación emite `sim/choque` |
+| Cabeza de Oído | `estado.oido.cabeza`: grados respecto al cuerpo (+ = derecha), acotada a ±`CONFIG.movimiento.gradosCabezaMax`. La mirada y el oyente del audio apuntan a `rumbo + cabeza`; vuelve a 0 al caminar o girar |
 | Mapa | `Mapa.celdas`: filas de norte a sur; `#` pared, `.` piso, `P` casilla de puerta |
 
 Para pasar de rumbo a vector: `dx = sin(rumbo)`, `dz = −cos(rumbo)` (con el rumbo en radianes).
@@ -47,7 +48,7 @@ El prefijo dice quién emite. **Solo la simulación emite `sim/*`.**
 |---|---|---|---|
 | `oido/mover` | Cliente Oído | `dir`, `corriendo` | Un paso de 1 m. Se ignora si Oído ya se está moviendo. Correr suma ruido |
 | `oido/girar` | Cliente Oído | `sentido` | Giro de 90° (`CONFIG.movimiento.gradosPorGiro`) |
-| `oido/girarFino` | Cliente Oído | `grados` | Giro fino con el mouse |
+| `oido/girarFino` | Cliente Oído | `grados` | El mouse gira solo la cabeza, nunca el cuerpo |
 | `oido/interactuar` | Cliente Oído | — | Agarra el objeto al alcance o usa la puerta de enfrente |
 | `vista/camara` | Cliente Vista | `numero` (1–5) | Cambia la cámara activa |
 | `vista/puerta` | Cliente Vista | — | Abre o cierra la puerta de la cámara activa. Cerrar es un portazo (ruido) |
@@ -90,7 +91,8 @@ Valores propios de un módulo que no estén en `src/config.ts` van en un archivo
 | Cliente Oído (pantalla y controles) | `src/oido/index.ts` | `crearClienteOido(bus, contenedor, mapa): Sistema` |
 | Cliente Vista (cámaras, mapa, HUD) | `src/vista/index.ts` | `crearClienteVista(bus, contenedor, mapa): Sistema` |
 | Mundo 3D compartido | `src/mundo3d/index.ts` | `construirMundo(mapa, { mostrarOido? }): { escena, actualizar(estado, dtSeg), destruir() }` (geometría y texturas PSX; lo usan las dos pantallas, cada una con su escena y sus luces) · `estadoInicial(mapa)` |
-| Audio de Oído | `src/audio/index.ts` | `crearAudio(bus, mapa, ctx: AudioContext, voz: VozRadio): Sistema` |
+| Audio de Oído | `src/audio/index.ts` | `crearAudio(bus, mapa, ctx: AudioContext, voz: VozRadio \| null, opciones?: { monitor?: boolean }): Sistema`. `monitor: true` es la PC de Vista en dos PC: misma mezcla por una bocina de monitor, sin voz del radio |
+| Voz grabada del radio | `src/radio/vozGrabada.ts` | `crearVozGrabada(ctx, respaldo: VozRadio \| null, urlManifiesto?): VozRadio`. Lee `public/radio/voces.json` (`{ clips: { "<orden normalizada>": "archivo.wav" } }`) y expone `salida` para que el audio la pase por la cadena de radio. Los clips se generan con `node tools/generar-voces.mjs` |
 | Voz del radio | `src/radio/voz.ts` | `crearVozSintetica(): VozRadio` (después: `crearVozGrabada(ctx)`) |
 | Panel del radio | `src/radio/index.ts` | `crearPanelRadio(bus, contenedor, lsm: LsmEngine \| null): Sistema` · `fichasATexto(fichas): string` |
 | Conteo de dedos | `src/radio/dedos.ts` | `contarDedos(frame: HandFrame): 0–5` |
@@ -108,7 +110,7 @@ Reglas de las interfaces:
 
 - Un paso dura `CONFIG.movimiento.segPorPaso`; durante ese tiempo `oido.moviendose` es `true` y la posición de `sim/estado` va interpolada. `sim/paso` llega al terminar.
 - El ruido es un número de 0 a 1: el máximo entre el micrófono y el ruido del juego, que baja solo con el tiempo. Las zonas salen de `CONFIG.ruido`.
-- El monstruo: `patrulla` → `escucha` (ruido en cuidado) → `caza` (ruido en peligro) → `atrapa` (alcanza a Oído). Sin ruido vuelve a `patrulla`. No atraviesa puertas cerradas.
+- El monstruo: merodea al azar (`patrulla`), se detiene o investiga con ruido en cuidado (`escucha`), va al último punto del ruido en peligro (`caza`) y `atrapa` si alcanza a Oído. **No atrapa a un Oído quieto y en silencio** salvo que esté cazando. No atraviesa puertas cerradas. `Simulacion` acepta un cuarto parámetro `azar` para pruebas deterministas. Detalle en `docs/DISENO.md` §5.2.
 - Interactuar alcanza 1.2 m al frente. La salida solo se abre con la llave y abrirla termina la partida con `ganaron`.
 
 ## 6. Dueños de archivos

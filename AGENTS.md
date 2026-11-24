@@ -17,8 +17,8 @@
 
 **Dos Mundos** es un juego cooperativo de terror en 3D (estilo PSX) para dos personas: un **Five Nights at Freddy's cooperativo**.
 
-- **Jugador1 = Vista.** La persona que ve el juego. En la historia está encerrada en la caseta de vigilancia: ve las cámaras y controla las puertas, **pero no puede hablar** (un gas le quitó la voz) **ni oye el juego** (no lleva audífonos). Se comunica **con señas de la Lengua de Señas Mexicana** frente a la cámara: arma un mensaje, lo confirma y le llega a Oído por el radio.
-- **Jugador2 = Oído.** La persona que juega **con los ojos vendados y audífonos**. En la historia está a oscuras dentro del edificio, con un monstruo que caza por el ruido. Se mueve con **flechas y mouse**, se orienta con **audio espacial 3D** y con una **pulsera háptica**, y obedece (o no) lo que Vista le dice por el radio.
+- **Jugador1 = Vista.** La persona que ve el juego. En la historia está encerrada en la caseta de vigilancia: ve las cámaras y controla las puertas, **pero no puede hablar** (un gas le quitó la voz). Oye el edificio por la bocina de su caseta (desde el 2026-11-24 también usa audífonos). Se comunica **con señas de la Lengua de Señas Mexicana** frente a la cámara: arma un mensaje, lo confirma y le llega a Oído por el radio.
+- **Jugador2 = Oído.** La persona que juega **con los ojos vendados y audífonos**. En la historia está a oscuras dentro del edificio, con un monstruo que caza por el ruido. Se mueve **por casillas con WASD o flechas** (el mouse solo gira la cabeza), se orienta con **audio espacial 3D** y con una **pulsera háptica**, y obedece (o no) lo que Vista le dice por el radio.
 
 Es un proyecto de la universidad: se presentará en un **foro de proyectos** y su rubrica pide **al menos dos interfaces además de la gráfica**. Dos Mundos usa cuatro: **gestual** (señas), **auditiva espacial 3D**, **de voz** (radio sintetizado, transcripción y volumen como ruido) y **háptica** (pulsera con Arduino).
 
@@ -34,7 +34,7 @@ Todo el detalle está en `docs/DISENO.md`. **Léelo antes de empezar.**
 | Arte 3D | Generado **por código** por la IA (geometría procedural y texturas generadas). Si se usa algún asset externo, solo CC0 y registrado en `CREDITOS.md` |
 | Audio | **WebAudio**: `PannerNode` en modo HRTF por fuente, atenuación por distancia, **oclusión** (filtro de graves si hay pared entre la fuente y Oído), **reverberación por cuarto** (`ConvolverNode`), pasos según el piso. El radio va en mono con filtro de banda y estática |
 | Señas | **Módulo `ecos-lsm`** del proyecto ECOS (ver §3) |
-| Voz | Radio: `speechSynthesis` (es-MX) en el MVP, detrás de una interfaz para cambiar después a clips grabados por el equipo y concatenados con WebAudio. Reconocimiento (fase 2): Web Speech API para prototipo; **Vosk** con gramática cerrada para el foro (sin internet) |
+| Voz | Radio: **clips grabados** en `public/radio/` (generados una vez con Gemini TTS, `tools/generar-voces.mjs`; la clave va en `.env.local`, nunca en el repo), con `speechSynthesis` de respaldo. Reconocimiento (fase 2): Web Speech API para prototipo; **Vosk** con gramática cerrada para el foro (sin internet) |
 | Ruido | Volumen del micrófono (RMS en dBFS) contra un ruido base calibrado al inicio |
 | Red | **Una PC** (pantalla y teclado divididos) o **dos PC**: un relevo WebSocket dentro del servidor de Vite (`tools/relevo.ts`), por HTTPS con `npm run red`; la PC de Oído simula el juego y le manda el estado a Vista |
 | Háptica | Arduino + 2 motores de vibración, conectado por **Web Serial** (Chrome) a la PC de Oído. Fase 2 |
@@ -90,10 +90,10 @@ Cópialo a este proyecto (`src/lsm/` + `public/mediapipe/hand_landmarker.task` +
 | · Hito 0: base (Vite, Three.js, `src/lsm/`, bus local, contratos) | ✅ 2026-11-19 | `docs/CONTRATOS.md` |
 | · Hito 1: mundo y simulación | ✅ 2026-11-19 | `src/sim/`, `src/data/alaEste.ts`; 51 pruebas |
 | · Hito 2: pantallas (Oído en tinieblas, cámaras VHS de Vista) | ✅ 2026-11-19 | Visto en el navegador. Falta: pointer lock real y medir FPS en la PC del foro |
-| · Hito 3: audio 3D | 🔨 Código hecho | **Nadie lo ha oído todavía**: falta probar con audífonos de diadema y ajustar volúmenes |
-| · Hito 4: radio (señas, números con dedos, voz) | 🔨 Código hecho | Probado con teclado. **Falta probar con cámara**: señas sostenidas, conteo de dedos y S de emergencia |
-| · Hito 5: ruido y monstruo | 🔨 Código hecho | Lógica probada. **Falta probar el micrófono real** y su calibración |
-| · Hito 6: partida completa | 🔨 | Se gana de principio a fin con teclado en el navegador. Falta la partida real con dos personas, tutorial guiado y punto de control |
+| · Hito 3: audio 3D | 🔨 | El equipo lo oyó en dos PC: «muy bueno», pero el monstruo no asustaba. **Voz del monstruo rehecha y Vista con audio (2026-11-24): falta oírlos** |
+| · Hito 4: radio (señas, números con dedos, voz) | 🔨 | Voz en español con clips grabados (2026-11-24). **Falta oír los clips** y confirmar que cada uno dice su frase |
+| · Hito 5: ruido y monstruo | 🔨 | Micrófono real probado. Monstruo rehecho el 2026-11-24 (merodea; quieto y en silencio no atrapa). 182 pruebas. **Falta jugarlo** para afinar el balance |
+| · Hito 6: partida completa | 🔨 | Jugado en dos PC el 2026-11-23 sin poder ganar; reglas corregidas el 2026-11-24 (tablero, WASD, monstruo). Falta volver a jugarlo, tutorial guiado y punto de control |
 | Dos PC en red | ✅ 2026-11-23 | `npm run red`; `docs/CONTRATOS.md` §7. **Probado con dos PC reales por hotspot** y aprobado por la profesora. La red de la escuela aísla los equipos: usar hotspot |
 | Fase 2: ecolocalización, transcripción, Vosk | ⬜ | |
 | Pulsera háptica (Arduino) | ⬜ | El equipo tiene un Arduino; plan en `docs/DISENO.md` §8 |

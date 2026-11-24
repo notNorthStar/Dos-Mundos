@@ -1,17 +1,20 @@
 /**
  * El radio del lado de Oído: cola de mensajes, chasquidos, estática con filtro de banda y ducking.
  *
- *   ruido blanco ─▶ pasa-altas 300 ─▶ pasa-bajas 3000 ─▶ aleteo ─▶ ganancia ─▶ mezcla.radio
+ *   ruido blanco ─▶ pasa-altas 300 ─▶ pasa-bajas 3000 ─▶ aleteo ─▶ ganancia ─────────────┐
+ *   voz.salida (si existe) ─▶ mono ─▶ pasa-altas ─▶ realce ─▶ pasa-bajas ─▶ saturación ─▶ volumen ─┴─▶ mezcla.radio
  *
- * La voz la produce `VozRadio` (hoy speechSynthesis, fuera de WebAudio). Garantías:
+ * La voz la produce `VozRadio`: la sintética (speechSynthesis) suena fuera de WebAudio; la grabada
+ * trae `salida` y aquí se le pone el sonido de transmisión. Garantías:
  *  - Un mensaje a la vez; las emergencias interrumpen (voz.callar()) y pasan primero.
  *  - Si la voz nunca avisa que terminó, un tope de tiempo la da por terminada.
  *  - La mezcla siempre se suelta al vaciarse la cola, al limpiar o si algo falla.
+ *  - Sin voz (`null`, PC de Vista en modo monitor): solo chasquido y estática de transmisión.
  */
 import type { VozRadio } from '../shared/contratos';
 import { AJUSTES_AUDIO } from './ajustes';
 import type { Mezcla } from './mezcla';
-import type { Sintesis } from './nucleo';
+import { curvaSaturacion, type Sintesis } from './nucleo';
 import { chasquido } from './sonidos';
 
 const R = AJUSTES_AUDIO.radio;
@@ -31,19 +34,25 @@ export class ColaRadio {
   private readonly esperas = new Set<() => void>();
   private estatica: { src: AudioBufferSourceNode; nodos: AudioNode[]; g: GainNode } | null = null;
   private destruida = false;
+  /** Cadena de transmisión para una voz que suena por WebAudio (null si la voz no trae `salida`). */
+  private cadenaVoz: { entrada: AudioNode; nodos: AudioNode[] } | null = null;
 
   constructor(
     private readonly s: Sintesis,
     private readonly mezcla: Mezcla,
-    private readonly voz: VozRadio,
-  ) {}
+    private readonly voz: VozRadio | null,
+  ) {
+    if (voz?.salida) this.cadenaVoz = this.crearCadenaVoz(voz.salida);
+  }
 
   encolar(item: ItemRadio): void {
     if (this.destruida || item.texto.trim() === '') return;
+    // Sin voz, la narración no tiene nada que sonar.
+    if (!this.voz && !item.radio) return;
     if (item.emergencia) {
       this.cola.unshift(item);
       if (this.ocupado) {
-        this.voz.callar();
+        this.callarVoz();
         this.cortarEsperas();
       }
     } else {
@@ -61,7 +70,7 @@ export class ColaRadio {
   limpiar(): void {
     this.generacion++;
     this.cola = [];
-    this.voz.callar();
+    this.callarVoz();
     this.cortarEsperas();
     this.cerrarEstatica();
     this.mezcla.agachar(1);
@@ -70,6 +79,60 @@ export class ColaRadio {
   destruir(): void {
     this.limpiar();
     this.destruida = true;
+    const c = this.cadenaVoz;
+    this.cadenaVoz = null;
+    if (c) {
+      try {
+        this.voz?.salida?.disconnect(c.entrada);
+      } catch {
+        // ya desconectada
+      }
+      for (const n of c.nodos) n.disconnect();
+    }
+  }
+
+  private callarVoz(): void {
+    try {
+      this.voz?.callar();
+    } catch {
+      // la voz nunca debe romper el radio
+    }
+  }
+
+  /** voz.salida ─▶ mono ─▶ banda de radio con realce ─▶ saturación suave ─▶ mezcla.radio. */
+  private crearCadenaVoz(salida: AudioNode): { entrada: AudioNode; nodos: AudioNode[] } {
+    const ctx = this.s.ctx;
+    const V = R.voz;
+    const entrada = ctx.createGain();
+    entrada.channelCount = 1;
+    entrada.channelCountMode = 'explicit';
+    entrada.channelInterpretation = 'speakers';
+    const hp = ctx.createBiquadFilter();
+    hp.type = 'highpass';
+    hp.frequency.value = R.hzBajo;
+    hp.Q.value = 0.7;
+    const realce = ctx.createBiquadFilter();
+    realce.type = 'peaking';
+    realce.frequency.value = V.hzRealce;
+    realce.Q.value = 1;
+    realce.gain.value = V.dbRealce;
+    const lp = ctx.createBiquadFilter();
+    lp.type = 'lowpass';
+    lp.frequency.value = R.hzAlto;
+    lp.Q.value = 0.7;
+    const sat = ctx.createWaveShaper();
+    sat.curve = curvaSaturacion(V.saturacion);
+    sat.oversample = '2x';
+    const vol = ctx.createGain();
+    vol.gain.value = V.volumen;
+    salida.connect(entrada);
+    entrada.connect(hp);
+    hp.connect(realce);
+    realce.connect(lp);
+    lp.connect(sat);
+    sat.connect(vol);
+    vol.connect(this.mezcla.radio);
+    return { entrada, nodos: [entrada, hp, realce, lp, sat, vol] };
   }
 
   private async procesar(): Promise<void> {
@@ -100,6 +163,11 @@ export class ColaRadio {
         this.abrirEstatica();
         await this.esperar(R.segAntesVoz);
         if (gen !== this.generacion) return;
+      }
+      if (!this.voz) {
+        // Monitor de Vista: solo la transmisión, para saber que el mensaje salió.
+        await this.esperar(R.segEstaticaSinVoz);
+        return;
       }
       const tope = Math.max(R.segMinVoz, item.texto.length * R.segPorCaracter + R.segMargenVoz);
       let decir: Promise<void>;

@@ -1,0 +1,29 @@
+{
+  "modelo": "gemini-3.8-flash-lite-tts",
+  "voz": "Algenib",
+  "clips": {
+    "avanza": "avanza.wav",
+    "avanza un paso": "avanza_un_paso.wav",
+    "avanza dos pasos": "avanza_dos_pasos.wav",
+    "avanza tres pasos": "avanza_tres_pasos.wav",
+    "avanza cuatro pasos": "avanza_cuatro_pasos.wav",
+    "avanza cinco pasos": "avanza_cinco_pasos.wav",
+    "date la vuelta": "date_la_vuelta.wav",
+    "retrocede un paso": "retrocede_un_paso.wav",
+    "retrocede dos pasos": "retrocede_dos_pasos.wav",
+    "retrocede tres pasos": "retrocede_tres_pasos.wav",
+    "retrocede cuatro pasos": "retrocede_cuatro_pasos.wav",
+    "retrocede cinco pasos": "retrocede_cinco_pasos.wav",
+    "gira a la izquierda": "gira_a_la_izquierda.wav",
+    "gira a la derecha": "gira_a_la_derecha.wav",
+    "sube": "sube.wav",
+    "agáchate, está en el piso": "agachate_esta_en_el_piso.wav",
+    "quieto, no hagas ruido": "quieto_no_hagas_ruido.wav",
+    "ahí está, agárralo": "ahi_esta_agarralo.wav",
+    "un paso": "un_paso.wav",
+    "dos pasos": "dos_pasos.wav",
+    "tres pasos": "tres_pasos.wav",
+    "cuatro pasos": "cuatro_pasos.wav",
+    "cinco pasos": "cinco_pasos.wav"
+  }
+}

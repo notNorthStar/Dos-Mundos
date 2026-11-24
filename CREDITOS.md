@@ -18,5 +18,8 @@ Listick Games.
 ## Uso de IA
 El código y el arte por código se hacen con ayuda de IA (Claude Code). El registro está en `AI_LOG.md`.
 
+## Voces generadas
+Los clips del radio (`public/radio/*.wav`) se generaron con Gemini TTS de Google (modelo `gemini-3.8-flash-lite-tts`, voz «Algenib») con la cuenta del equipo.
+
 ## Assets externos
 Ninguno por ahora. Si se agrega alguno, solo CC0 y registrado aquí.

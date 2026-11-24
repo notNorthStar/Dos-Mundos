@@ -154,17 +154,15 @@ export class Disparo {
   /** Distorsión suave (tanh) para gruñidos y gritos. */
   saturador(cantidad: number): WaveShaperNode {
     const w = this.ctx.createWaveShaper();
-    const n = 1024;
-    const curva = new Float32Array(n);
-    const k = Math.max(0.001, cantidad);
-    for (let i = 0; i < n; i++) {
-      const x = (i / (n - 1)) * 2 - 1;
-      curva[i] = Math.tanh(k * x) / Math.tanh(k);
-    }
-    w.curve = curva;
+    w.curve = curvaSaturacion(cantidad);
     w.oversample = '2x';
     this.nodos.push(w);
     return w;
+  }
+
+  /** false cuando ya terminó (todas sus fuentes acabaron y se desconectó). */
+  get vivo(): boolean {
+    return !this.terminado;
   }
 
   /** Ruido de `t` a `t + dur` (con desfase aleatorio en el buffer para que nunca suene igual). */
@@ -287,9 +285,37 @@ export class Sintesis {
   }
 }
 
+/** Curva de saturación suave: tanh(k·x) normalizada para que ±1 siga dando ±1. */
+export function curvaSaturacion(cantidad: number, n = 1024): Float32Array<ArrayBuffer> {
+  const curva = new Float32Array(n);
+  const k = Math.max(0.001, cantidad);
+  for (let i = 0; i < n; i++) {
+    const x = (i / (n - 1)) * 2 - 1;
+    curva[i] = Math.tanh(k * x) / Math.tanh(k);
+  }
+  return curva;
+}
+
 /** Número aleatorio en [a, b). */
 export function azar(a: number, b: number): number {
   return a + Math.random() * (b - a);
+}
+
+/** Número aleatorio dentro de un rango [mín, máx] de ajustes.ts. */
+export function entre(r: readonly [number, number]): number {
+  return azar(r[0], r[1]);
+}
+
+/** Elige una clave al azar con pesos (los pesos ≤ 0 nunca salen). */
+export function elegir<K extends string>(pesos: Readonly<Record<K, number>>): K {
+  const claves = Object.keys(pesos) as K[];
+  const total = claves.reduce((s, k) => s + Math.max(0, pesos[k]), 0);
+  let r = Math.random() * total;
+  for (const k of claves) {
+    r -= Math.max(0, pesos[k]);
+    if (r < 0) return k;
+  }
+  return claves[claves.length - 1]!;
 }
 
 /** Multiplica por un factor aleatorio en [1 − v, 1 + v]. */
