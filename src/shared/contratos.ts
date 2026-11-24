@@ -140,6 +140,11 @@ export type Ficha = { tipo: 'sena'; sena: Sena } | { tipo: 'numero'; valor: 1 | 
 export interface VozRadio {
   /** Dice la frase y resuelve al terminar. Nunca lanza. */
   decir(texto: string): Promise<void>;
+  /**
+   * Si la voz suena por WebAudio (clips grabados), el nodo del que sale. El audio lo conecta a su
+   * cadena de radio (filtro de banda y estática). La voz sintética del navegador no lo tiene.
+   */
+  readonly salida?: AudioNode;
   callar(): void;
 }
 
